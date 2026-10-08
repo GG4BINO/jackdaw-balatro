@@ -22,7 +22,8 @@ from jackdaw.engine.actions import (
     SkipBlind,
     UseConsumable,
 )
-from jackdaw.engine.card_factory import create_consumable
+from jackdaw.engine.card_factory import create_consumable, create_playing_card
+from jackdaw.engine.data.enums import Rank, Suit
 from jackdaw.engine.data.hands import HandType
 from jackdaw.engine.data.prototypes import BLINDS
 from jackdaw.engine.game import IllegalActionError, step
@@ -175,3 +176,25 @@ def test_a_held_blue_seal_makes_one_planet_however_the_hand_is_ordered():
     gs["blind"].chips = 1
     step(gs, PlayHand(card_indices=(len(gs["hand"]) - 1,)))  # High Card
     assert [card.center_key for card in gs["consumables"]] == ["c_pluto"]
+
+
+# -- Secret hands: visible once played, not once levelled up (PC) -------------
+
+
+def test_a_black_hole_does_not_add_the_secret_hands_to_the_pool():
+    gs = initialize_run("b_red", GOLD, "VERIFYCC")
+    _win(gs)
+    _use(gs, "c_black_hole")
+    assert gs["hand_levels"].get_state(HandType.FIVE_OF_A_KIND).level == 2
+    assert len(hand_pick_pool(gs)) == 9
+
+
+def test_a_played_five_of_a_kind_joins_the_pool():
+    gs = initialize_run("b_red", GOLD, "VERIFYCC")
+    step(gs, SelectBlind())
+    for suit in (Suit.SPADES, Suit.HEARTS, Suit.DIAMONDS, Suit.CLUBS, Suit.SPADES):
+        gs["hand"].append(create_playing_card(suit, Rank.ACE))  # five Aces
+    gs["blind"].chips = 1
+    step(gs, PlayHand(card_indices=tuple(range(len(gs["hand"]) - 5, len(gs["hand"])))))
+    assert gs["hand_levels"].get_state(HandType.FIVE_OF_A_KIND).played == 1
+    assert hand_pick_pool(gs)[0] == "Five of a Kind" and len(hand_pick_pool(gs)) == 10

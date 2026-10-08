@@ -75,16 +75,18 @@ class HandLevels:
         h.level = max(0, h.level + amount)
         h.chips = max(0, base.s_chips + base.l_chips * (h.level - 1))
         h.mult = max(1, base.s_mult + base.l_mult * (h.level - 1))
-
-        # Make visible once leveled (secret hands become visible)
-        if h.level > 1:
-            h.visible = True
+        # Levelling up does not make a secret hand visible (level_up_hand
+        # leaves ``visible`` alone): after a Black Hole, To Do List still
+        # picks from 9 hands in the game (balatro-ai, stage 0).
 
     def record_play(self, hand_type: HandType | str) -> None:
-        """Record that *hand_type* was played once."""
+        """Record that *hand_type* was played once.  Playing a hand makes it
+        visible (evaluate_play sets ``G.GAME.hands[text].visible``): a played
+        Five of a Kind joins the hands To Do List picks from in the game."""
         ht = HandType(hand_type) if isinstance(hand_type, str) else hand_type
         self._hands[ht].played += 1
         self._hands[ht].played_this_round += 1
+        self._hands[ht].visible = True
 
     def reset_round_counts(self) -> None:
         """Reset ``played_this_round`` for all types (called at round start)."""

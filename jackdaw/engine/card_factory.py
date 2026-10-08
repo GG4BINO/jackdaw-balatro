@@ -740,30 +740,23 @@ def roll_to_do_hand(card, rng, hand_levels, exclude_current: bool = False) -> No
     pre-filtered OUT of the pool and a single pull is made — pass
     ``exclude_current=True`` for that variant.
 
-    Pool order matches G.GAME.hands iteration as validated for the
-    Orbital Tag (_ORBITAL_HANDS).
+    Pool: the visible hands in the game's order (tags.HAND_PICK_ORDER, the
+    order the PS5 showed for this list and the Orbital Tag's).
     """
-    from jackdaw.engine.tags import _ORBITAL_HANDS
+    from jackdaw.engine.tags import hand_pick_pool
 
     if rng is None:
         return
     old = card.ability.get("to_do_poker_hand")
-
-    def _visible(ht) -> bool:
-        if hand_levels is None:
-            return True
-        try:
-            return hand_levels.get_state(ht).visible
-        except Exception:
-            return True
+    levels = {"hand_levels": hand_levels}
 
     if exclude_current:
-        pool = [ht.value for ht in _ORBITAL_HANDS if _visible(ht) and ht.value != old]
+        pool = hand_pick_pool(levels, exclude=old)
         new_hand, _ = rng.element(pool, rng.seed("to_do"))
         card.ability["to_do_poker_hand"] = new_hand
         return
 
-    pool = [ht.value for ht in _ORBITAL_HANDS if _visible(ht)]
+    pool = hand_pick_pool(levels)
     chosen = None
     while chosen is None:
         v, _ = rng.element(pool, rng.seed("to_do"))

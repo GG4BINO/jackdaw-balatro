@@ -211,8 +211,12 @@ class TestAllModifiers:
         card = _playing_card("Hearts", "King", enhancement="m_glass")
         card.set_edition({"polychrome": True})
         card.set_seal("Purple")
-        card.set_eternal(True)
-        card.set_perishable(True)
+        # The serializer shows whatever stickers a card has; set them directly
+        # (set_eternal/set_perishable follow the game, which gives neither to
+        # a playing card, nor both to one card).
+        card.eternal = True
+        card.perishable = True
+        card.perish_tally = 5
         card.set_rental(True)
         card.set_debuff(True)
 

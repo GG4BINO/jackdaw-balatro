@@ -72,6 +72,12 @@ class SkipBlind:
     """Skip the current blind (Small or Big) and collect the tag reward."""
 
 
+@dataclass(frozen=True)
+class RerollBoss:
+    """Reroll the ante's boss for $10 (``G.FUNCS.reroll_boss``): Director's Cut
+    allows one reroll per ante, Retcon any number."""
+
+
 # ---------------------------------------------------------------------------
 # Hand play / discard
 # ---------------------------------------------------------------------------
@@ -264,6 +270,7 @@ Action = (
     | Discard
     | SelectBlind
     | SkipBlind
+    | RerollBoss
     | BuyCard
     | SellCard
     | UseConsumable
@@ -352,6 +359,20 @@ def get_legal_actions(game_state: dict[str, Any]) -> list[Action]:
 # ---------------------------------------------------------------------------
 
 
+REROLL_BOSS_COST = 10
+
+
+def can_reroll_boss(gs: dict[str, Any]) -> bool:
+    """Whether the boss reroll button is live (``G.FUNCS.reroll_boss_button``):
+    $10 to spare above the bankrupt floor, and Retcon, or Director's Cut not yet
+    used this ante."""
+    used = gs.get("used_vouchers") or {}
+    rerolled = (gs.get("round_resets") or {}).get("boss_rerolled", False)
+    allowed = "v_retcon" in used or ("v_directors_cut" in used and not rerolled)
+    affordable = gs.get("dollars", 0) - gs.get("bankrupt_at", 0) - REROLL_BOSS_COST >= 0
+    return allowed and affordable
+
+
 def _legal_blind_select(gs: dict[str, Any]) -> list[Action]:
     actions: list[Action] = []
     blind_on_deck = gs.get("blind_on_deck", "Small")
@@ -361,6 +382,9 @@ def _legal_blind_select(gs: dict[str, Any]) -> list[Action]:
     # Can skip Small and Big, but not Boss
     if blind_on_deck in ("Small", "Big"):
         actions.append(SkipBlind())
+
+    if can_reroll_boss(gs):
+        actions.append(RerollBoss())
 
     # Consumables usable during blind select
     actions.extend(_usable_consumables(gs))

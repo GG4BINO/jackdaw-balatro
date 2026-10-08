@@ -837,11 +837,10 @@ def _black_hole(card: Card, ctx: ConsumableContext) -> ConsumableResult:
     """Black Hole: level up ALL 12 hand types by 1.
 
     Source: card.lua:1175 — iterates G.GAME.hands and calls level_up_hand.
-    Usage totals are tracked centrally in use_consumable.
+    Usage totals are tracked centrally in use_consumable.  Black Hole is a
+    Spectral: it is never the last Tarot/Planet used (set_consumeable_usage
+    only records Tarots and Planets), so The Fool cannot copy it.
     """
-    gs = ctx.game_state
-    if gs is not None:
-        gs["last_tarot_planet"] = card.center_key
     return ConsumableResult(
         level_up=[(ht, 1) for ht in _ALL_HAND_TYPES],
         notify_jokers_consumeable=True,
@@ -952,11 +951,16 @@ def _roll_card_spec(
     """Roll one playing-card creation descriptor.
 
     Picks rank from *rank_pool*, suit from all four, and a random
-    non-Stone enhancement — all using the provided RNG seeds.
+    non-Stone enhancement — all using the provided RNG seeds.  A single
+    rank (Grim's Ace) is set, not drawn: card.lua sets ``_rank = 'A'``
+    and draws only the suit from 'grim_create'.
 
     Returns ``{'rank': str, 'suit': str, 'enhancement': str}``.
     """
-    rank_code, _ = rng.element(rank_pool, rng.seed(rank_seed))
+    if len(rank_pool) == 1:
+        rank_code = rank_pool[0]
+    else:
+        rank_code, _ = rng.element(rank_pool, rng.seed(rank_seed))
     suit_code, _ = rng.element(list(_SUIT_CODE), rng.seed(suit_seed))
     enhancement, _ = rng.element(_get_enhanced_pool(), rng.seed("spe_card"))
     return {

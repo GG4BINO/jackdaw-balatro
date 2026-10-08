@@ -69,7 +69,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from jackdaw.engine.data.hands import HandType
+from jackdaw.engine.data.hands import HAND_BASE, HandType
 from jackdaw.engine.data.prototypes import TAGS
 
 if TYPE_CHECKING:
@@ -126,23 +126,40 @@ class TagResult:
     """Make all shop items free (coupon tag)."""
 
 
-# Hand types available for Orbital Tag selection (all 12 hand types).
-# Order matches ``G.GAME.hands`` iteration order — Lua's pseudorandom_element
-# sorts by ``sort_id`` (= order field in HandBaseData).
-_ORBITAL_HANDS: list[HandType] = [
-    HandType.HIGH_CARD,
-    HandType.PAIR,
-    HandType.TWO_PAIR,
-    HandType.THREE_OF_A_KIND,
-    HandType.STRAIGHT,
-    HandType.FLUSH,
-    HandType.FULL_HOUSE,
-    HandType.FOUR_OF_A_KIND,
-    HandType.STRAIGHT_FLUSH,
-    HandType.FIVE_OF_A_KIND,
-    HandType.FLUSH_HOUSE,
-    HandType.FLUSH_FIVE,
-]
+# The poker hands To Do List and the Orbital Tag pick from, in the order the
+# game lists them (``pairs(G.GAME.hands)`` as the console iterates it): the
+# strongest first, as ``G.handlist`` and ``HandBaseData.order``.  Only the
+# visible ones are in the pool.  Confirmed on the PS5 (vanilla 1.0.1o): the To
+# Do List of BQZSVSAC's first shop draws place 1 of 9 (Straight Flush), and the
+# Orbital Tag of DHXXVBVV's ante 2 Small Blind, the 4th 'orbital' draw, place 3
+# of 9 (Full House).  Steamodded iterates the hands in another order.
+HAND_PICK_ORDER: list[HandType] = sorted(HAND_BASE, key=lambda ht: HAND_BASE[ht].order)
+
+# The blinds of an ante, in the order the game shows them.
+ANTE_BLINDS: tuple[str, ...] = ("Small", "Big", "Boss")
+
+
+def hand_pick_pool(game_state: dict[str, Any], exclude: str | None = None) -> list[str]:
+    """The visible poker hands (their names) in :data:`HAND_PICK_ORDER`, without
+    *exclude*: the list To Do List and the Orbital Tag draw a place from."""
+    levels = game_state.get("hand_levels")
+
+    def visible(ht: HandType) -> bool:
+        return levels.get_state(ht).visible if levels is not None else HAND_BASE[ht].visible
+
+    return [ht.value for ht in HAND_PICK_ORDER if visible(ht) and ht.value != exclude]
+
+
+def draw_orbital_choices(ante: int, rng: PseudoRandom, game_state: dict[str, Any]) -> dict:
+    """The Orbital Tag's hand for each blind of *ante*, drawn as the game does when
+    it first shows the ante's blinds (``create_UIBox_blind_choice``): one 'orbital'
+    draw per blind, Small, Big then Boss, whatever tag the blind has.  Kept in
+    ``game_state["orbital_choices"][ante]``; an Orbital Tag levels up the hand of
+    the blind it came from."""
+    pool = hand_pick_pool(game_state)
+    choices = {blind: rng.element(pool, rng.seed("orbital"))[0] for blind in ANTE_BLINDS}
+    game_state.setdefault("orbital_choices", {})[ante] = choices
+    return choices
 
 
 class Tag:
@@ -229,18 +246,12 @@ class Tag:
                 return TagResult(create_jokers=self.config["spawn_jokers"])
 
             if self.key == "tag_orbital":
-                if rng is None:
-                    raise ValueError("tag_orbital requires an rng instance")
-                seed_val = rng.seed("orbital")
-                # Select a random hand type — mirrors pseudorandom_element
-                # over the sorted hand list (sorted by order/sort_id in Lua)
-                from jackdaw.engine.data.hands import HAND_BASE
-
-                hands_by_order = sorted(HAND_BASE.keys(), key=lambda h: HAND_BASE[h].order)
-                idx = rng.random(seed_val, 1, len(hands_by_order))
-                chosen = hands_by_order[idx - 1]
-                levels = self.config["levels"]
-                return TagResult(level_up=(chosen, levels))
+                # The hand was drawn when the blind was shown
+                # (draw_orbital_choices); the caller passes it in.
+                hand = kwargs.get("orbital_hand")
+                if hand is None:
+                    raise ValueError("tag_orbital needs orbital_hand, its blind's hand")
+                return TagResult(level_up=(HandType(hand), self.config["levels"]))
 
             # Unknown immediate tag — no effect
             return None  # pragma: no cover
@@ -503,6 +514,9 @@ def assign_ante_blinds(
 
     # 4. Boss
     boss = get_new_boss(ante, bosses_used, rng)
+
+    # 5. The Orbital Tag's hand for each blind ('orbital' stream, its own)
+    draw_orbital_choices(ante, rng, game_state)
 
     blind_tags: dict[str, str] = {"Small": small, "Big": big}
 

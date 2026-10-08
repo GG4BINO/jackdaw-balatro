@@ -397,11 +397,48 @@ class TestScoringMethods:
 
 
 class TestStickers:
-    def test_set_perishable_resets_tally(self):
+    def _joker(self, key: str) -> Card:
         c = Card()
+        c.set_ability(key)
+        return c
+
+    def test_set_perishable_resets_tally(self):
+        c = self._joker("j_joker")
         c.perish_tally = 0
         c.set_perishable(True)
         assert c.perish_tally == 5
+
+    # Card:set_eternal / set_perishable (card.lua) look at the center's
+    # eternal_compat / perishable_compat; seen in Gold Stake shops on the PC
+    # (balatro-ai, stage 0): Popcorn never Eternal; Runner, Square Joker and
+    # Red Card never Perishable.
+
+    def test_popcorn_is_never_eternal(self):
+        c = self._joker("j_popcorn")
+        c.set_eternal(True)
+        assert c.eternal is False
+
+    @pytest.mark.parametrize("key", ["j_runner", "j_square", "j_red_card"])
+    def test_scaling_jokers_are_never_perishable(self, key):
+        c = self._joker(key)
+        c.set_perishable(True)
+        assert c.perishable is False
+
+    def test_a_joker_is_eternal_or_perishable_not_both(self):
+        c = self._joker("j_joker")
+        c.set_eternal(True)
+        c.set_perishable(True)
+        assert (c.eternal, c.perishable) == (True, False)
+        d = self._joker("j_joker")
+        d.set_perishable(True)
+        d.set_eternal(True)
+        assert (d.eternal, d.perishable) == (False, True)
+
+    def test_a_playing_card_takes_neither(self):
+        c = Card()
+        c.set_eternal(True)
+        c.set_perishable(True)
+        assert (c.eternal, c.perishable) == (False, False)
 
 
 # ============================================================================

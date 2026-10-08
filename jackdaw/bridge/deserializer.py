@@ -17,6 +17,7 @@ from jackdaw.engine.actions import (
     PlayHand,
     RedeemVoucher,
     Reroll,
+    RerollBoss,
     SelectBlind,
     SellCard,
     SkipBlind,
@@ -65,6 +66,8 @@ def rpc_to_action(method: str, params: dict | None = None) -> Action | None:
     if method == "select":
         return SelectBlind()
 
+    if method == "reroll_boss":
+        return RerollBoss()
     if method == "skip":
         return SkipBlind()
 

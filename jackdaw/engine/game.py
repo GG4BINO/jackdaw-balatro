@@ -33,6 +33,7 @@ from jackdaw.engine.actions import (
     PlayHand,
     RedeemVoucher,
     Reroll,
+    RerollBoss,
     SelectBlind,
     SellCard,
     SkipBlind,
@@ -78,6 +79,8 @@ def _dispatch(game_state: dict[str, Any], action: Action) -> dict[str, Any]:
             return _handle_select_blind(game_state)
         case SkipBlind():
             return _handle_skip_blind(game_state)
+        case RerollBoss():
+            return _handle_reroll_boss(game_state)
         case PlayHand(card_indices=indices):
             return _handle_play_hand(game_state, indices)
         case Discard(card_indices=indices):
@@ -429,12 +432,27 @@ def _award_tag(gs: dict[str, Any], tag_key: str, source: str) -> None:
     """
     from jackdaw.engine.tags import Tag
 
-    tag_result = Tag(tag_key).apply("immediate", gs, rng=gs.get("rng"))
+    extra = {}
+    if tag_key == "tag_orbital":
+        extra["orbital_hand"] = _orbital_hand(gs, source)
+    tag_result = Tag(tag_key).apply("immediate", gs, rng=gs.get("rng"), **extra)
     gs.setdefault("awarded_tags", []).append(
         {"key": tag_key, "result": tag_result, "blind": source}
     )
     if tag_result is not None:
         _apply_tag_result(gs, tag_result)
+
+
+def _orbital_hand(gs: dict[str, Any], blind: str) -> str:
+    """The hand an Orbital Tag from *blind* levels up: the one drawn for that blind
+    when the ante's blinds were shown (tags.draw_orbital_choices)."""
+    from jackdaw.engine.tags import draw_orbital_choices
+
+    ante = gs["round_resets"]["ante"]
+    choices = gs.get("orbital_choices", {}).get(ante)
+    if choices is None:  # a state saved before the choices were kept
+        choices = draw_orbital_choices(ante, gs["rng"], gs)
+    return choices[blind]
 
 
 def _apply_tag_result(gs: dict[str, Any], result: Any) -> None:
@@ -476,6 +494,29 @@ def _apply_tag_result(gs: dict[str, Any], result: Any) -> None:
         if hand_levels is not None:
             for _ in range(levels):
                 hand_levels.level_up(hand_type)
+
+
+def _handle_reroll_boss(gs: dict[str, Any]) -> dict[str, Any]:
+    """Reroll the boss (Director's Cut / Retcon), as ``G.FUNCS.reroll_boss``
+    does: $10, the reroll marked for the ante, and ``get_new_boss`` drawn again
+    on the 'boss' stream with the rerolled-away boss still counted as used
+    (confirmed on the PS5 and the PC with the Boss Tag, which calls the same
+    function: FWQQGDZG's The Head became The Hook, and ante 2's boss The
+    Psychic)."""
+    from jackdaw.engine.actions import REROLL_BOSS_COST, can_reroll_boss
+    from jackdaw.engine.blind import get_new_boss
+
+    _require_phase(gs, GamePhase.BLIND_SELECT)
+    if not can_reroll_boss(gs):
+        raise IllegalActionError(
+            "Cannot reroll the boss: needs Retcon, or Director's Cut once per ante, and $10"
+        )
+    rr = gs["round_resets"]
+    gs["dollars"] = gs.get("dollars", 0) - REROLL_BOSS_COST
+    rr["boss_rerolled"] = True
+    bosses_used = gs.setdefault("bosses_used", {})
+    rr.setdefault("blind_choices", {})["Boss"] = get_new_boss(rr["ante"], bosses_used, gs["rng"])
+    return gs
 
 
 def _handle_skip_blind(gs: dict[str, Any]) -> dict[str, Any]:
@@ -2065,7 +2106,9 @@ def _round_won(gs: dict[str, Any]) -> None:
                 planet_key = pk
                 break
         if planet_key:
-            for c in hand:
+            # Over a copy: creating a card may sort the hand in place, and the
+            # loop must still see each held card once.
+            for c in list(hand):
                 if getattr(c, "seal", None) == "Blue" and not getattr(c, "debuff", False):
                     _resolve_create_descriptors(
                         gs,
@@ -3316,8 +3359,13 @@ def _check_double_tag(gs: dict[str, Any], awarded_tag_key: str) -> None:
 
     awarded: list = gs.setdefault("awarded_tags", [])
     doubles = [e for e in awarded if e.get("key") == "tag_double"]
+    extra = {}
+    if awarded_tag_key == "tag_orbital":
+        # The copy levels up the same hand (tag.lua: G.orbital_hand).
+        original = next(e for e in reversed(awarded) if e.get("key") == "tag_orbital")
+        extra["orbital_hand"] = original["result"].level_up[0].value
     for dbl in doubles:
-        dup_result = Tag(awarded_tag_key).apply("immediate", gs, rng=gs.get("rng"))
+        dup_result = Tag(awarded_tag_key).apply("immediate", gs, rng=gs.get("rng"), **extra)
         awarded.append(
             {
                 "key": awarded_tag_key,

@@ -405,11 +405,21 @@ class Card:
         self.seal = seal
 
     def set_eternal(self, eternal: bool) -> None:
-        self.eternal = eternal
+        """Card:set_eternal (card.lua): only a Joker whose center allows it
+        (``eternal_compat``) and is not Perishable becomes Eternal; for any
+        other card the sticker is cleared."""
+        self.eternal = (
+            bool(eternal) and _sticker_compat(self, "eternal_compat") and not self.perishable
+        )
 
     def set_perishable(self, perishable: bool) -> None:
-        self.perishable = perishable
-        if perishable:
+        """Card:set_perishable (card.lua): only a Joker whose center allows it
+        (``perishable_compat``) and is not Eternal becomes Perishable (Popcorn
+        can never be Eternal; Runner, Square Joker, Red Card... never Perishable)."""
+        self.perishable = (
+            bool(perishable) and _sticker_compat(self, "perishable_compat") and not self.eternal
+        )
+        if self.perishable:
             self.perish_tally = 5
 
     def set_rental(self, rental: bool) -> None:
@@ -885,3 +895,12 @@ class Card:
         if self.base:
             return f"Card({self.base.rank} of {self.base.suit}, center={self.center_key!r})"
         return f"Card(center={self.center_key!r}, name={self.ability.get('name', '?')!r})"
+
+
+def _sticker_compat(card: Card, flag: str) -> bool:
+    """Whether ``card``'s center allows a sticker (``eternal_compat`` /
+    ``perishable_compat``): only Jokers do, as their data says."""
+    from jackdaw.engine.data.prototypes import JOKERS
+
+    proto = JOKERS.get(card.center_key)
+    return bool(proto is not None and getattr(proto, flag))

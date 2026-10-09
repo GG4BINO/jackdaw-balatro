@@ -2034,15 +2034,41 @@ class TestCrimsonHeartPassiveEffects:
             now = {j.center_key: j.debuff for j in gs["jokers"]}
             assert gs["hand_size"] == self._size(gs, base)
             # the draw fills the hand to the size before the pick; then each Joker whose
-            # change makes the hand bigger draws that many cards more
+            # change makes the hand bigger draws that many cards more, up to the new size
             grew = sum(
                 max(0, self.EFFECTS[key][0] * (1 if was[key] else -1))
                 for key in was
                 if was[key] != now[key]
             )
-            assert len(gs["hand"]) == max(limit, held - 1) + grew
+            filled = max(limit, held - 1)
+            assert len(gs["hand"]) == filled + max(0, min(grew, gs["hand_size"] - filled))
             seen |= {key for key, off in now.items() if off}
         assert seen == set(self.EFFECTS)  # each Joker was disabled at least once
+
+    def test_a_lone_stuntman_enabled_and_disabled_again_leaves_the_hand_as_it_was(self):
+        """Its only Joker is enabled (the hand 2 smaller) and disabled again (2 bigger):
+        the full hand draws nothing.  Seen in the game (balatro-ai's verify
+        crimson_hand_size): 8 cards after each hand, the limit 8."""
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _init_gs("CRIMSON")
+        stuntman = create_joker("j_stuntman")
+        stuntman.add_to_deck(gs)
+        gs["jokers"] = [stuntman]
+        step(gs, SelectBlind())
+        boss = Blind.create("bl_final_heart", ante=1)
+        boss.chips = 10**9
+        gs["blind"] = boss
+        boss.prepped = True
+        from jackdaw.engine.game import _draw_more
+
+        dth = boss.drawn_to_hand(gs["hand"], joker_cards=gs["jokers"], rng=gs["rng"],
+                                 game_state=gs)  # fmt: skip
+        _draw_more(gs, dth.get("hand_grew", 0))
+        assert stuntman.debuff and len(gs["hand"]) == gs["hand_size"] == 8
+        for _ in range(3):
+            step(gs, PlayHand(card_indices=(0,)))
+            assert stuntman.debuff and len(gs["hand"]) == gs["hand_size"] == 8
 
     def test_the_disabled_drunkard_takes_its_discard_back(self):
         gs, base, boss = self._setup()

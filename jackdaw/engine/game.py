@@ -1901,14 +1901,17 @@ def _sort_hand_desc(hand: list) -> None:
 
 
 def _draw_more(gs: dict[str, Any], count: int) -> None:
-    """``count`` more cards from the top of the deck, the hand sorted again: the game's
-    ``CardArea:change_size`` when a Joker's hand size comes into play during a round
-    (Crimson Heart disabling Stuntman or enabling Juggler again)."""
+    """Up to ``count`` more cards from the top of the deck, no more than the hand's size
+    holds, the hand sorted again: the game's ``CardArea:change_size`` when a Joker's
+    hand size comes into play during a round (Crimson Heart disabling Stuntman or
+    enabling Juggler again).  Seen in the game: a lone Stuntman Crimson Heart enables
+    and disables again each hand leaves a full hand as it was."""
     deck: list = gs.get("deck", [])
     hand: list = gs.setdefault("hand", [])
+    count = min(count, gs.get("hand_size", 0) - len(hand), len(deck))
     if count <= 0 or not hand:
         return
-    for _ in range(min(count, len(deck))):
+    for _ in range(count):
         hand.append(deck.pop())
     _sort_hand_desc(hand)
 

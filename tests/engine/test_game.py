@@ -575,6 +575,27 @@ class TestPackOpening:
         assert gs["phase"] == GamePhase.SHOP
         assert gs["pack_cards"] == []
 
+    def test_a_consumable_is_used_with_the_pack_open(self):
+        """The game lets a held consumable be used while a pack is open (its
+        can_use_consumeable does not look at the pack states): a played run used
+        Justice, which Hallucination had just made, on a card of an Arcana pack's hand."""
+        from jackdaw.engine.card_factory import create_consumable
+
+        gs = _setup_shop("PACK_USE")
+        pack = Card(center_key="p_arcana_normal_1", cost=4)
+        pack.ability = {"set": "Booster", "name": "Arcana Pack"}
+        gs["shop_boosters"] = [pack]
+        gs["dollars"] = 10
+        step(gs, OpenBooster(card_index=0))
+        choices, target = gs["pack_choices_remaining"], gs["hand"][0]
+        gs["consumables"] = [create_consumable("c_justice")]
+        step(gs, UseConsumable(card_index=0, target_indices=(0,)))
+        assert gs["phase"] == GamePhase.PACK_OPENING
+        assert gs["pack_choices_remaining"] == choices and gs["consumables"] == []
+        assert target.center_key == "m_glass"
+        step(gs, SkipPack())
+        assert gs["phase"] == GamePhase.SHOP and target in gs["deck"]
+
 
 class TestUseConsumable:
     def test_use_planet_in_shop(self):

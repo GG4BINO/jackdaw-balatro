@@ -20,7 +20,8 @@ Each phase permits a specific subset of actions:
 | SHOP                | BuyCard, SellCard, UseConsumable, RedeemVoucher,     |
 |                     | OpenBooster, Reroll, SwapJokersLeft/Right, NextRound |
 +---------------------+------------------------------------------------------+
-| PACK_OPENING        | PickPackCard, SkipPack                               |
+| PACK_OPENING        | PickPackCard, SkipPack (UseConsumable is executed    |
+|                     | too, as in vanilla, but not offered)                 |
 +---------------------+------------------------------------------------------+
 | ROUND_EVAL          | CashOut                                              |
 +---------------------+------------------------------------------------------+

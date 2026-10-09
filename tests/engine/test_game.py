@@ -936,6 +936,38 @@ class TestJokerPassivesOnAcquisition:
         assert gs["hand_size"] == before + 1
 
 
+class TestPlayingCardJoinsTheDeckAtTheBottom:
+    """G.deck:emplace puts a playing card taken from a Standard pack, or bought, at the
+    bottom of the deck (CardArea:emplace inserts at 1 in a deck area): it is drawn last.
+    Seen in a played run: an Arcana pack opened after the pick dealt the deck's next
+    card, not the one picked."""
+
+    def _card(self):
+        card = Card(center_key="c_base")
+        card.set_base("S_5", "Spades", "5")
+        card.ability = {"set": "Default", "effect": "", "name": "Default Base"}
+        return card
+
+    def test_a_standard_pack_pick(self):
+        gs = _setup_shop()
+        top = gs["deck"][-1]
+        picked = self._card()
+        gs["phase"] = GamePhase.PACK_OPENING
+        gs["pack_cards"] = [picked]
+        gs["pack_choices_remaining"] = 1
+        step(gs, PickPackCard(card_index=0))
+        assert gs["deck"][0] is picked and gs["deck"][-1] is top
+
+    def test_a_bought_playing_card(self):
+        gs = _setup_shop()
+        top = gs["deck"][-1]
+        bought = self._card()
+        bought.cost = 0
+        gs["shop_cards"] = [bought]
+        step(gs, BuyCard(shop_index=0))
+        assert gs["deck"][0] is bought and gs["deck"][-1] is top
+
+
 class TestBuySpaceGuard:
     """The executor must refuse no-room buys/picks itself, not just rely
     on the legality mask hiding them (hand-built actions bypass the mask)."""
@@ -2040,15 +2072,14 @@ class TestCrimsonHeartPassiveEffects:
                 for key in was
                 if was[key] != now[key]
             )
-            filled = max(limit, held - 1)
-            assert len(gs["hand"]) == filled + max(0, min(grew, gs["hand_size"] - filled))
+            assert len(gs["hand"]) == max(limit, held - 1) + grew
             seen |= {key for key, off in now.items() if off}
         assert seen == set(self.EFFECTS)  # each Joker was disabled at least once
 
-    def test_a_lone_stuntman_enabled_and_disabled_again_leaves_the_hand_as_it_was(self):
-        """Its only Joker is enabled (the hand 2 smaller) and disabled again (2 bigger):
-        the full hand draws nothing.  Seen in the game (balatro-ai's verify
-        crimson_hand_size): 8 cards after each hand, the limit 8."""
+    def test_a_lone_stuntman_picked_again_changes_nothing(self):
+        """Its only Joker is picked again: nothing changes, the hand draws nothing.
+        Seen in the game (balatro-ai's verify crimson_hand_size): 8 cards after each
+        hand, the limit 8."""
         from jackdaw.engine.card_factory import create_joker
 
         gs = _init_gs("CRIMSON")

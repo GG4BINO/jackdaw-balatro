@@ -408,22 +408,32 @@ class Blind:
         # The blind's start preps it too (game._handle_select_blind): a
         # recorded game had a Joker disabled before any hand or discard.
         if self.name == "Crimson Heart" and getattr(self, "prepped", False) and rng and joker_cards:
-            # Clear all joker debuffs, then debuff one random
+            # Clear all joker debuffs, then debuff one random.  The Jokers' passive
+            # effects follow what changed in the end: the one enabled again first,
+            # then the one disabled.  Seen in the game (balatro-ai's verify
+            # crimson_hand_size): a lone Stuntman picked again changes nothing.
+            was = [bool(j.debuff) for j in joker_cards]
             eligible = []
-            grew = 0
             for i, j in enumerate(joker_cards):
                 if not j.debuff or len(joker_cards) < 2:
                     eligible.append(i)
-                grew += set_joker_debuff(j, False, game_state)
+                j.set_debuff(False)
+            picked = None
             if eligible:
                 # The game's pseudorandom_element sorts the Jokers by sort_id:
                 # their order on screen does not change the pick.
-                _, idx = rng.element(
+                _, picked = rng.element(
                     {i: joker_cards[i] for i in eligible},
                     rng.seed("crimson_heart"),
                 )
-                grew += set_joker_debuff(joker_cards[idx], True, game_state)
-                result["debuffed_joker_index"] = idx
+                result["debuffed_joker_index"] = picked
+            grew = 0
+            for i, j in enumerate(joker_cards):  # enabled again, first
+                j.set_debuff(was[i])
+                if was[i] and i != picked:
+                    grew += set_joker_debuff(j, False, game_state)
+            if picked is not None:
+                grew += set_joker_debuff(joker_cards[picked], True, game_state)
             if grew:
                 result["hand_grew"] = grew
 

@@ -1269,7 +1269,8 @@ def _handle_buy_card(gs: dict[str, Any], idx: int) -> dict[str, Any]:
         gs.setdefault("consumables", []).append(card)
         card.add_to_deck(gs)
     else:
-        gs.setdefault("deck", []).append(card)
+        # G.deck:emplace, as a Standard pack's pick: the bottom of the deck.
+        gs.setdefault("deck", []).insert(0, card)
         added_playing_card = True
 
     # Astronomer joining the board runs the all-cards set_cost pass
@@ -1720,8 +1721,11 @@ def _handle_pick_pack_card(
             _all_cards_set_cost_pass(gs)
 
     else:
-        # Standard pack: playing card → add to deck
-        gs.setdefault("deck", []).append(card)
+        # Standard pack: playing card → add to deck.  G.deck:emplace puts it at
+        # the bottom (CardArea:emplace inserts at 1 in a deck area): drawn last,
+        # not next (seen in a played run: an Arcana pack opened after the pick
+        # dealt the next card of the deck, not the one picked).
+        gs.setdefault("deck", []).insert(0, card)
         # Fire playing_card_added joker context (Hologram)
         _fire_shop_joker_context(gs, playing_card_added=True, cards=[card])
 
@@ -1901,14 +1905,14 @@ def _sort_hand_desc(hand: list) -> None:
 
 
 def _draw_more(gs: dict[str, Any], count: int) -> None:
-    """Up to ``count`` more cards from the top of the deck, no more than the hand's size
-    holds, the hand sorted again: the game's ``CardArea:change_size`` when a Joker's
-    hand size comes into play during a round (Crimson Heart disabling Stuntman or
-    enabling Juggler again).  Seen in the game: a lone Stuntman Crimson Heart enables
-    and disables again each hand leaves a full hand as it was."""
+    """``count`` more cards from the top of the deck, the hand sorted again: the game's
+    ``CardArea:change_size`` when a Joker's hand size comes into play during a round
+    (Crimson Heart disabling Stuntman or enabling Juggler again).  As many as the hand
+    grew by, even past its size: seen in the game, Juggler enabled again with 7 cards
+    held and the size back to 7 drew 1."""
     deck: list = gs.get("deck", [])
     hand: list = gs.setdefault("hand", [])
-    count = min(count, gs.get("hand_size", 0) - len(hand), len(deck))
+    count = min(count, len(deck))
     if count <= 0 or not hand:
         return
     for _ in range(count):

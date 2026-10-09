@@ -759,12 +759,14 @@ class Card:
                 return {"repetitions": 1, "card": self}
         return None
 
-    def add_to_deck(self, game_state: dict) -> None:
+    def add_to_deck(self, game_state: dict, from_debuff: bool = False) -> None:
         """Apply joker's passive effects when added to deck (card.lua:Card:add_to_deck).
 
         Mutates *game_state* in-place.  Matches card.lua:564 exactly.
         game_state keys: hand_size, discards, joker_slots, probabilities_normal,
         bankrupt_at, free_rerolls, hands_per_round, interest_amount.
+        ``from_debuff``: the Joker is enabled again (Card:set_debuff), not added: a
+        Negative's slot was never taken away.
         """
         name = self.ability.get("name", "")
         extra = self.ability.get("extra")
@@ -820,7 +822,7 @@ class Card:
         if name == "Stuntman" and isinstance(extra, dict):
             game_state["hand_size"] = game_state.get("hand_size", 0) - extra.get("h_size", 0)
 
-        if self.edition and self.edition.get("negative"):
+        if self.edition and self.edition.get("negative") and not from_debuff:
             # card.lua:568 routes the Negative slot bonus by card type:
             # consumables raise the consumable limit, everything else jokers.
             if self.ability.get("consumeable") or self.ability.get("set") in (
@@ -832,10 +834,12 @@ class Card:
             else:
                 game_state["joker_slots"] = game_state.get("joker_slots", 0) + 1
 
-    def remove_from_deck(self, game_state: dict) -> None:
+    def remove_from_deck(self, game_state: dict, from_debuff: bool = False) -> None:
         """Reverse joker's passive effects when removed from deck (card.lua:Card:remove_from_deck).
 
         Mirrors :meth:`add_to_deck` — each effect is undone.  Matches card.lua:648.
+        ``from_debuff``: the Joker is disabled (Card:set_debuff), not removed: a
+        Negative keeps its slot (the game only queues the removal).
         """
         name = self.ability.get("name", "")
         extra = self.ability.get("extra")
@@ -881,7 +885,7 @@ class Card:
         if name == "Stuntman" and isinstance(extra, dict):
             game_state["hand_size"] = game_state.get("hand_size", 0) + extra.get("h_size", 0)
 
-        if self.edition and self.edition.get("negative"):
+        if self.edition and self.edition.get("negative") and not from_debuff:
             if self.ability.get("consumeable") or self.ability.get("set") in (
                 "Tarot",
                 "Planet",

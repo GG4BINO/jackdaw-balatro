@@ -1986,3 +1986,86 @@ class TestCrimsonHeart:
             step(gs, PlayHand(card_indices=(0,)))
             picks.append([j.center_key for j in gs["jokers"] if j.debuff])
         assert picks[0] == picks[1] and len(picks[0]) == 1
+
+
+class TestCrimsonHeartPassiveEffects:
+    """A Joker Crimson Heart disables loses its passive effects, and gets them back when
+    enabled again (Card:set_debuff runs remove_from_deck / add_to_deck): Stuntman's and
+    Juggler's hand size, Drunkard's discard.  A hand made bigger during the round draws
+    the cards at once (CardArea:change_size).  Found in a played run: the game drew 8
+    cards after Crimson Heart disabled Stuntman, Jackdaw 6."""
+
+    # each Joker's hand size and discards while it is enabled
+    EFFECTS = {"j_stuntman": (-2, 0), "j_juggler": (1, 0), "j_drunkard": (0, 1)}
+
+    def _setup(self):
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _init_gs("CRIMSON")
+        base = gs["hand_size"]
+        jokers = [create_joker(key) for key in self.EFFECTS]
+        for joker in jokers:
+            joker.add_to_deck(gs)
+        gs["jokers"] = jokers
+        step(gs, SelectBlind())
+        boss = Blind.create("bl_final_heart", ante=1)
+        boss.chips = 10**9
+        gs["blind"] = boss
+        gs["current_round"]["hands_left"] = 20
+        boss.prepped = True  # as at the blind's start
+        return gs, base, boss
+
+    def _size(self, gs, base):
+        return base + sum(self.EFFECTS[j.center_key][0] for j in gs["jokers"] if not j.debuff)
+
+    def test_the_disabled_joker_takes_its_hand_size_and_the_hand_grows_at_once(self):
+        from jackdaw.engine.game import _draw_more
+
+        gs, base, boss = self._setup()
+        dth = boss.drawn_to_hand(gs["hand"], joker_cards=gs["jokers"], rng=gs["rng"],
+                                 game_state=gs)  # fmt: skip
+        _draw_more(gs, dth.get("hand_grew", 0))
+        assert gs["hand_size"] == self._size(gs, base)
+        seen = set()
+        for _ in range(8):
+            limit, held = gs["hand_size"], len(gs["hand"])
+            was = {j.center_key: j.debuff for j in gs["jokers"]}
+            step(gs, PlayHand(card_indices=(0,)))
+            now = {j.center_key: j.debuff for j in gs["jokers"]}
+            assert gs["hand_size"] == self._size(gs, base)
+            # the draw fills the hand to the size before the pick; then each Joker whose
+            # change makes the hand bigger draws that many cards more
+            grew = sum(
+                max(0, self.EFFECTS[key][0] * (1 if was[key] else -1))
+                for key in was
+                if was[key] != now[key]
+            )
+            assert len(gs["hand"]) == max(limit, held - 1) + grew
+            seen |= {key for key, off in now.items() if off}
+        assert seen == set(self.EFFECTS)  # each Joker was disabled at least once
+
+    def test_the_disabled_drunkard_takes_its_discard_back(self):
+        gs, base, boss = self._setup()
+        drunkard = next(j for j in gs["jokers"] if j.center_key == "j_drunkard")
+        for _ in range(12):
+            left = gs["current_round"]["discards_left"]
+            was = drunkard.debuff
+            step(gs, PlayHand(card_indices=(0,)))
+            if drunkard.debuff != was:
+                assert gs["current_round"]["discards_left"] == left + (1 if was else -1)
+                return
+        pytest.fail("Crimson Heart never changed Drunkard")
+
+    def test_a_disabled_negative_joker_keeps_its_slot(self):
+        from jackdaw.engine.blind import set_joker_debuff
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _init_gs("CRIMSON")
+        joker = create_joker("j_joker")
+        joker.edition = {"negative": True}
+        joker.add_to_deck(gs)
+        slots = gs.get("joker_slots", 0)
+        set_joker_debuff(joker, True, gs)
+        assert joker.debuff and gs.get("joker_slots", 0) == slots
+        set_joker_debuff(joker, False, gs)
+        assert not joker.debuff and gs.get("joker_slots", 0) == slots

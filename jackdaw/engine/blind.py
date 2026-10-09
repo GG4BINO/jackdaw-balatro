@@ -16,6 +16,25 @@ from jackdaw.engine.data.blind_scaling import get_blind_amount
 from jackdaw.engine.data.prototypes import BLINDS
 
 
+def set_joker_debuff(joker: Any, debuff: bool, game_state: dict[str, Any] | None) -> int:
+    """``Card:set_debuff`` on a Joker (card.lua): a change of state takes its passive
+    effects off (``remove_from_deck(true)``: Stuntman's and Juggler's hand size,
+    Drunkard's discards, Oops! All 6s...) or puts them back (``add_to_deck(true)``).
+    Returns the cards to draw at once: the game's ``CardArea:change_size`` draws as
+    many cards as a hand made bigger during a round grows by.  Without
+    ``game_state`` only the flag changes."""
+    if game_state is None or bool(joker.debuff) == debuff:
+        joker.set_debuff(debuff)
+        return 0
+    before = game_state.get("hand_size", 0)
+    if debuff:
+        joker.remove_from_deck(game_state, from_debuff=True)
+    else:
+        joker.add_to_deck(game_state, from_debuff=True)
+    joker.set_debuff(debuff)
+    return max(0, game_state.get("hand_size", 0) - before)
+
+
 @dataclass
 class Blind:
     """Active blind for the current round.
@@ -350,14 +369,18 @@ class Blind:
         hand_cards: list[Any],
         joker_cards: list[Any] | None = None,
         rng: Any | None = None,
+        game_state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Boss effect when cards are drawn to hand.
 
-        Matches ``Blind:drawn_to_hand`` (blind.lua:572-603).
+        Matches ``Blind:drawn_to_hand`` (blind.lua:572-603).  With ``game_state``,
+        a Joker Crimson Heart disables or enables again loses or regains its
+        passive effects (``set_joker_debuff``).
 
         Returns side-effect descriptor:
             ``forced_card_index``: index in hand_cards to force-select (Cerulean Bell)
             ``debuffed_joker_index``: index in joker_cards to debuff (Crimson Heart)
+            ``hand_grew``: cards to draw at once, the hand made bigger (Crimson Heart)
         """
         result: dict[str, Any] = {}
 
@@ -387,10 +410,11 @@ class Blind:
         if self.name == "Crimson Heart" and getattr(self, "prepped", False) and rng and joker_cards:
             # Clear all joker debuffs, then debuff one random
             eligible = []
+            grew = 0
             for i, j in enumerate(joker_cards):
                 if not j.debuff or len(joker_cards) < 2:
                     eligible.append(i)
-                j.set_debuff(False)
+                grew += set_joker_debuff(j, False, game_state)
             if eligible:
                 # The game's pseudorandom_element sorts the Jokers by sort_id:
                 # their order on screen does not change the pick.
@@ -398,8 +422,10 @@ class Blind:
                     {i: joker_cards[i] for i in eligible},
                     rng.seed("crimson_heart"),
                 )
-                joker_cards[idx].set_debuff(True)
+                grew += set_joker_debuff(joker_cards[idx], True, game_state)
                 result["debuffed_joker_index"] = idx
+            if grew:
+                result["hand_grew"] = grew
 
         self.prepped = False
         return result

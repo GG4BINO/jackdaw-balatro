@@ -280,12 +280,14 @@ def _handle_select_blind(gs: dict[str, Any]) -> dict[str, Any]:
             hand_cards=gs.get("hand", []),
             joker_cards=gs.get("jokers"),
             rng=rng,
+            game_state=gs,
         )
         if dth.get("forced_card_index") is not None:
             hand = gs.get("hand", [])
             idx = dth["forced_card_index"]
             if 0 <= idx < len(hand):
                 hand[idx].ability["forced_selection"] = True
+        _draw_more(gs, dth.get("hand_grew", 0))
 
     # ------------------------------------------------------------------
     # 8. Phase → SELECTING_HAND
@@ -872,12 +874,14 @@ def _handle_play_hand(gs: dict[str, Any], indices: tuple[int, ...]) -> dict[str,
                 hand_cards=gs.get("hand", []),
                 joker_cards=jokers,
                 rng=rng,
+                game_state=gs,
             )
             if dth.get("forced_card_index") is not None:
                 hand = gs.get("hand", [])
                 idx = dth["forced_card_index"]
                 if 0 <= idx < len(hand):
                     hand[idx].ability["forced_selection"] = True
+            _draw_more(gs, dth.get("hand_grew", 0))
 
     return gs
 
@@ -1113,12 +1117,14 @@ def _handle_discard(gs: dict[str, Any], indices: tuple[int, ...]) -> dict[str, A
             hand_cards=gs.get("hand", []),
             joker_cards=jokers,
             rng=rng,
+            game_state=gs,
         )
         if dth.get("forced_card_index") is not None:
             hand = gs.get("hand", [])
             idx = dth["forced_card_index"]
             if 0 <= idx < len(hand):
                 hand[idx].ability["forced_selection"] = True
+        _draw_more(gs, dth.get("hand_grew", 0))
 
     return gs
 
@@ -1892,6 +1898,19 @@ def _sort_hand_desc(hand: list) -> None:
     non-playing-card entries are left at the end.
     """
     hand.sort(key=lambda c: c.get_nominal() if hasattr(c, "get_nominal") else -1e9, reverse=True)
+
+
+def _draw_more(gs: dict[str, Any], count: int) -> None:
+    """``count`` more cards from the top of the deck, the hand sorted again: the game's
+    ``CardArea:change_size`` when a Joker's hand size comes into play during a round
+    (Crimson Heart disabling Stuntman or enabling Juggler again)."""
+    deck: list = gs.get("deck", [])
+    hand: list = gs.setdefault("hand", [])
+    if count <= 0 or not hand:
+        return
+    for _ in range(min(count, len(deck))):
+        hand.append(deck.pop())
+    _sort_hand_desc(hand)
 
 
 def _draw_hand(gs: dict[str, Any]) -> None:

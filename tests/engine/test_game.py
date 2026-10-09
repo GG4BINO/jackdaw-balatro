@@ -1614,6 +1614,17 @@ class TestCeremonialDaggerOnBlindSelect:
         step(gs, SelectBlind())
         assert len(gs["jokers"]) == 1
 
+    def test_a_dagger_madness_takes_cuts_nothing(self):
+        """Madness marks its victim at once (card.lua): a Dagger it picks does
+        not cut its neighbour, and a neighbour it picks is not the Dagger's
+        (live-verified: 74YH2KQH, Madness took the Dagger, Pareidolia stayed)."""
+        for seed, left in (("MADNESS2", "j_flower_pot"), ("MADNESS1", "j_ceremonial")):
+            gs = _init_gs(seed)
+            gs["jokers"] = [_joker_card("j_madness"), _joker_card("j_ceremonial"),
+                            _joker_card("j_flower_pot", sell_cost=3)]  # fmt: skip
+            step(gs, SelectBlind())
+            assert [j.center_key for j in gs["jokers"]] == ["j_madness", left], seed
+
 
 # ---------------------------------------------------------------------------
 # hands_played counters are pre-increment during scoring (bug #58)

@@ -2316,9 +2316,38 @@ def _fire_setting_blind(
             # Madness must exclude ITSELF from its destroy pool
             # (card.lua: v ~= self) — record who fired the mutation.
             entry["_source_joker"] = joker
+            _mark_sliced(gs, entry, jokers)
             mutations.append(entry)
 
     return mutations
+
+
+def _mark_sliced(gs: dict[str, Any], entry: dict[str, Any], jokers: list) -> None:
+    """A Joker a setting_blind effect destroys is marked ``getting_sliced`` at
+    once, as the game does in the calculate itself (card.lua Madness and
+    Ceremonial Dagger branches; the removal comes later, in an event): the
+    Jokers after it see the mark. A Ceremonial Dagger that Madness has
+    picked does not cut its neighbour (live-verified: 74YH2KQH, Madness
+    took the Dagger and Pareidolia stayed). Madness picks its victim here,
+    with its own roll, even when it is being destroyed itself (the roll is
+    made, the cut is not)."""
+    source = entry.get("_source_joker")
+    if entry.pop("destroy_random_joker", False) and len(jokers) > 1:
+        rng = gs.get("rng")
+        candidates = [
+            j
+            for j in jokers
+            if j is not source
+            and not getattr(j, "eternal", False)
+            and not getattr(j, "getting_sliced", False)
+        ]
+        if rng and candidates:
+            target, _ = rng.element(candidates, rng.seed("madness"))
+            if not getattr(source, "getting_sliced", False):
+                entry["destroy_joker"] = target
+    target = entry.get("destroy_joker")
+    if target is not None:
+        target.getting_sliced = True
 
 
 def _apply_setting_blind_mutations(
@@ -2339,39 +2368,16 @@ def _apply_setting_blind_mutations(
                 for card in gs.get("deck", []):
                     card.debuff = False
 
-        # Madness: destroy a random OTHER joker.  Vanilla's pool excludes
-        # SELF, eternals, and getting_sliced cards, in board order
-        # (card.lua Madness branch).  The old jokers[0] exclusion picked
-        # from the wrong pool whenever Madness wasn't first
-        # (live-verified: LS5EUNSF destroyed j_square vs sim's
-        # j_red_card from the same 'madness' roll).
-        if mut.get("destroy_random_joker") and len(jokers) > 1:
-            if rng:
-                source = mut.get("_source_joker")
-                candidates = [
-                    j
-                    for j in jokers
-                    if j is not source
-                    and not getattr(j, "eternal", False)
-                    and not getattr(j, "getting_sliced", False)
-                ]
-                if candidates:
-                    seed_val = rng.seed("madness")
-                    target, _ = rng.element(candidates, seed_val)
-                    jokers.remove(target)
-                    target.remove_from_deck(gs)
-                    _release_used_key(gs, target)
-
-        # Ceremonial Dagger: destroy the joker to its right (the +2x
-        # sell-value mult bump happens in the handler, card.lua:2561).
-        # This mutation was never processed — the dagger gained mult
-        # but its victim survived on the sim (live-verified: LSL9ZZUW,
-        # live destroyed the fresh-bought Flower Pot at blind select).
-        _dagger_target = mut.get("destroy_joker")
-        if _dagger_target is not None and _dagger_target in jokers:
-            jokers.remove(_dagger_target)
-            _dagger_target.remove_from_deck(gs)
-            _release_used_key(gs, _dagger_target)
+        # Madness (its victim picked when it fired, ``_mark_sliced``) and
+        # Ceremonial Dagger: destroy the Joker marked. The Dagger's +2x
+        # sell-value mult bump happens in the handler (card.lua:2561).
+        # (live-verified: LSL9ZZUW, live destroyed the fresh-bought Flower
+        # Pot at blind select; LS5EUNSF, Madness's pool in board order.)
+        _target = mut.get("destroy_joker")
+        if _target is not None and _target in jokers:
+            jokers.remove(_target)
+            _target.remove_from_deck(gs)
+            _release_used_key(gs, _target)
 
         # Burglar: set hands / remove discards
         if "set_hands" in mut:

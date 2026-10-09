@@ -268,7 +268,7 @@ def initialize_run(
     if back_config.get("randomize_rank_suit"):
         sp["erratic_suits_and_ranks"] = True
 
-    # Starting consumables (Magic Deck, Ghost Deck) — stored for caller to add
+    # Starting consumables (Magic Deck, Ghost Deck): made once the deck is (step 11)
     starting_consumables: list[str] = mutations.get("starting_consumables", [])
     gs["starting_consumables"] = starting_consumables
 
@@ -335,6 +335,23 @@ def initialize_run(
     # 10. Shuffle deck (RNG-driven, matches game.lua:2383)
     # -----------------------------------------------------------------------
     _shuffle_deck(deck, rng, gs["round_resets"]["ante"])
+
+    # -----------------------------------------------------------------------
+    # 11. Starting consumables (Magic Deck: two The Fool; Ghost Deck: a Hex)
+    # -----------------------------------------------------------------------
+    # Back:apply_to_run makes them in an event, after start_run has built the
+    # deck: create_card with a forced key (no draw on any stream) into the
+    # consumable slots; as any made card, set_ability marks its key used and
+    # it gets its price (a starting The Fool sells for $1).
+    from jackdaw.engine.card_factory import create_consumable
+
+    for c_key in mutations.get("starting_consumables", []):
+        card = create_consumable(c_key)
+        card.set_cost(
+            inflation=gs.get("inflation", 0), discount_percent=gs.get("discount_percent", 0)
+        )
+        gs.setdefault("consumables", []).append(card)
+        gs.setdefault("used_jokers", {})[c_key] = True
 
     # -----------------------------------------------------------------------
     # 12. Reset targeting cards

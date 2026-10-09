@@ -180,6 +180,33 @@ class TestZodiacDeck:
         assert self._gs()["tarot_rate"] == 9.6
 
 
+# ---------------------------------------------------------------------------
+# Integration: the decks that start with consumables
+# ---------------------------------------------------------------------------
+
+
+class TestStartingConsumables:
+    """Back:apply_to_run makes the deck's consumables once the deck is built: the
+    Ghost Deck's Hex, the Magic Deck's two The Fool, priced and marked used."""
+
+    def test_ghost_deck_starts_with_a_hex(self):
+        gs = initialize_run("b_ghost", 1, "TESTSEED")
+        (hex_card,) = gs["consumables"]
+        assert hex_card.center_key == "c_hex" and hex_card.sell_cost == 2
+        assert gs["used_jokers"].get("c_hex") is True
+        assert hex_card.sort_id > max(card.sort_id for card in gs["deck"])
+
+    def test_magic_deck_starts_with_two_fools(self):
+        gs = initialize_run("b_magic", 1, "TESTSEED")
+        assert [card.center_key for card in gs["consumables"]] == ["c_fool", "c_fool"]
+        assert [card.sell_cost for card in gs["consumables"]] == [1, 1]
+
+    def test_the_deck_and_the_draws_are_as_without_them(self):
+        ghost = initialize_run("b_ghost", 1, "TESTSEED")
+        red = initialize_run("b_red", 1, "TESTSEED")
+        assert [c.card_key for c in ghost["deck"]] == [c.card_key for c in red["deck"]]
+
+
 # ============================================================================
 # Profile (merged from test_profile.py)
 # ============================================================================

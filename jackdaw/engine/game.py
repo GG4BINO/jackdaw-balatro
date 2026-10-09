@@ -274,6 +274,8 @@ def _handle_select_blind(gs: dict[str, Any]) -> dict[str, Any]:
     # 7b. Boss drawn_to_hand effects (Cerulean Bell, Crimson Heart)
     # ------------------------------------------------------------------
     if blind.boss and not blind.disabled:
+        if blind.name == "Crimson Heart":
+            blind.prepped = True  # a Joker is disabled before the first hand
         dth = blind.drawn_to_hand(
             hand_cards=gs.get("hand", []),
             joker_cards=gs.get("jokers"),

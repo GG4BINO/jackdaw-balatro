@@ -1931,3 +1931,46 @@ class TestShowmanReadmitsHeldJokerInShop:
 
     def test_without_showman_held_joker_stays_out(self):
         assert "j_joker" not in self._first_shop_keys("SHOW47", showman=False)
+
+
+# ---------------------------------------------------------------------------
+# Crimson Heart
+# ---------------------------------------------------------------------------
+
+
+class TestCrimsonHeart:
+    """Crimson Heart disables another Joker after each hand played, not after a discard:
+    the game's drawn_to_hand picks again only when the blind is prepped, and press_play
+    preps it (blind.lua: ``self.name == 'Crimson Heart' and self.prepped``)."""
+
+    def _setup(self):
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _init_gs("CRIMSON")
+        step(gs, SelectBlind())
+        boss = Blind.create("bl_final_heart", ante=1)
+        boss.chips = 10**9
+        gs["blind"] = boss
+        gs["jokers"] = [create_joker(k) for k in ("j_joker", "j_greedy_joker", "j_lusty_joker")]
+        boss.prepped = True  # as at the blind's start
+        boss.drawn_to_hand([], joker_cards=gs["jokers"], rng=gs["rng"])
+        return gs
+
+    @staticmethod
+    def _disabled(gs):
+        return [j.sort_id for j in gs["jokers"] if j.debuff]
+
+    def test_a_discard_keeps_the_disabled_joker(self):
+        gs = self._setup()
+        before = self._disabled(gs)
+        assert len(before) == 1
+        step(gs, Discard(card_indices=(0, 1)))
+        step(gs, Discard(card_indices=(0,)))
+        assert self._disabled(gs) == before
+
+    def test_a_played_hand_disables_another(self):
+        gs = self._setup()
+        before = self._disabled(gs)
+        step(gs, PlayHand(card_indices=(0,)))
+        after = self._disabled(gs)
+        assert len(after) == 1 and after != before  # never the same one twice running

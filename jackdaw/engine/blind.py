@@ -379,7 +379,12 @@ class Blind:
                 )
                 result["forced_card_index"] = idx
 
-        if self.name == "Crimson Heart" and rng and joker_cards:
+        # Crimson Heart picks again only on a draw the blind was prepped for:
+        # press_play preps it (blind.lua: ``self.name == 'Crimson Heart' and
+        # self.prepped``), so a discard's redraw keeps the Joker it disabled.
+        # The blind's start preps it too (game._handle_select_blind): a
+        # recorded game had a Joker disabled before any hand or discard.
+        if self.name == "Crimson Heart" and getattr(self, "prepped", False) and rng and joker_cards:
             # Clear all joker debuffs, then debuff one random
             eligible = []
             for i, j in enumerate(joker_cards):

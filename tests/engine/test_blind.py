@@ -353,11 +353,24 @@ class TestDrawnToHandCrimsonHeart:
 
         jokers = [create_joker("j_joker"), create_joker("j_greedy_joker")]
         rng = PseudoRandom("TESTSEED")
+        b.prepped = True  # after a played hand (press_play), or at the blind's start
         result = b.drawn_to_hand([], joker_cards=jokers, rng=rng)
         assert "debuffed_joker_index" in result
         # Exactly one joker should be debuffed
         debuffed = [j for j in jokers if j.debuff]
         assert len(debuffed) == 1
+
+    def test_a_draw_it_was_not_prepped_for_picks_nothing(self):
+        """A discard's redraw: the Joker it disabled stays the one."""
+        reset_sort_id_counter()
+        b = Blind.create("bl_final_heart", ante=1)
+        from jackdaw.engine.card_factory import create_joker
+
+        jokers = [create_joker("j_joker"), create_joker("j_greedy_joker")]
+        jokers[1].set_debuff(True)
+        result = b.drawn_to_hand([], joker_cards=jokers, rng=PseudoRandom("TESTSEED"))
+        assert "debuffed_joker_index" not in result
+        assert [j.debuff for j in jokers] == [False, True]
 
 
 # ============================================================================

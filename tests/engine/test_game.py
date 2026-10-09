@@ -1974,3 +1974,15 @@ class TestCrimsonHeart:
         step(gs, PlayHand(card_indices=(0,)))
         after = self._disabled(gs)
         assert len(after) == 1 and after != before  # never the same one twice running
+
+    def test_the_pick_does_not_depend_on_the_jokers_order(self):
+        """pseudorandom_element sorts by sort_id: the same Joker is disabled whatever
+        order the Jokers stand in."""
+        picks = []
+        for flip in (False, True):
+            gs = self._setup()
+            if flip:
+                gs["jokers"].reverse()
+            step(gs, PlayHand(card_indices=(0,)))
+            picks.append([j.center_key for j in gs["jokers"] if j.debuff])
+        assert picks[0] == picks[1] and len(picks[0]) == 1

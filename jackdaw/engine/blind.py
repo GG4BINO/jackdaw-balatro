@@ -392,8 +392,10 @@ class Blind:
                     eligible.append(i)
                 j.set_debuff(False)
             if eligible:
+                # The game's pseudorandom_element sorts the Jokers by sort_id:
+                # their order on screen does not change the pick.
                 _, idx = rng.element(
-                    {i: i for i in eligible},
+                    {i: joker_cards[i] for i in eligible},
                     rng.seed("crimson_heart"),
                 )
                 joker_cards[idx].set_debuff(True)

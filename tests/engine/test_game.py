@@ -271,6 +271,49 @@ class TestSellCard:
         assert len(gs["jokers"]) == 0
 
     @staticmethod
+    def _verdant_leaf(jokers) -> dict[str, Any]:
+        """A round under Verdant Leaf: every playing card debuffed."""
+        gs = _init_gs()
+        step(gs, SelectBlind())
+        boss = Blind.create("bl_final_leaf", ante=8)
+        gs["blind"] = boss
+        for card in gs["hand"] + gs["deck"]:
+            boss.debuff_card(card)
+        gs["jokers"] = list(jokers)
+        return gs
+
+    def test_selling_a_joker_disables_verdant_leaf(self):
+        """card.lua Card:sell_card: a Joker sold under Verdant Leaf disables it, and
+        every playing card is freed of its debuff."""
+        gs = self._verdant_leaf([_joker_card(sell_cost=2), _joker_card("j_greedy_joker")])
+        assert all(card.debuff for card in gs["hand"] + gs["deck"])
+
+        step(gs, SellCard(area="jokers", card_index=0))
+
+        assert gs["blind"].disabled is True
+        assert not any(card.debuff for card in gs["hand"] + gs["deck"])
+        assert [joker.center_key for joker in gs["jokers"]] == ["j_greedy_joker"]
+
+    def test_a_consumable_sold_leaves_verdant_leaf_on(self):
+        gs = self._verdant_leaf([_joker_card()])
+        gs["consumables"] = [_make_consumable("c_moon", sell_cost=1)]
+
+        step(gs, SellCard(area="consumables", card_index=0))
+
+        assert gs["blind"].disabled is False
+        assert all(card.debuff for card in gs["hand"] + gs["deck"])
+
+    def test_a_perished_joker_stays_debuffed_when_the_boss_is_disabled(self):
+        """card.lua Card:set_debuff: a spent Perishable stays debuffed whatever asks."""
+        perished = _joker_card("j_greedy_joker", perishable=True, perish_tally=0, debuff=True)
+        gs = self._verdant_leaf([_joker_card(), perished])
+
+        step(gs, SellCard(area="jokers", card_index=0))
+
+        assert gs["blind"].disabled is True
+        assert gs["jokers"][0].debuff is True
+
+    @staticmethod
     def _diet_cola() -> Card:
         cola = Card()
         cola.set_ability("j_diet_cola")

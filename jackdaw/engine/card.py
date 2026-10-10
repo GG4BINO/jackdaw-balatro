@@ -426,6 +426,11 @@ class Card:
         self.rental = rental
 
     def set_debuff(self, should_debuff: bool) -> None:
+        """Card:set_debuff (card.lua): a spent Perishable stays debuffed, whatever a
+        boss disabled or a Crimson Heart moving on asks."""
+        if self.perishable and self.perish_tally <= 0:
+            self.debuff = True
+            return
         self.debuff = should_debuff
 
     def set_cost(

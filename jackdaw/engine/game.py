@@ -1349,6 +1349,18 @@ def _handle_sell_card(gs: dict[str, Any], area: str, idx: int) -> dict[str, Any]
     if getattr(card, "center_key", "") == "j_astronomer":
         _all_cards_set_cost_pass(gs)
 
+    # A Joker sold under Verdant Leaf disables it (Card:sell_card, card.lua), which
+    # frees every playing card of its debuff. Live queues the disable while the card
+    # is still owned; once it is gone the outcome is the same.
+    blind = gs.get("blind")
+    if (
+        area == "jokers"
+        and blind is not None
+        and blind.name == "Verdant Leaf"
+        and not blind.disabled
+    ):
+        _disable_active_blind(gs)
+
     # Fire selling_card joker context (Campfire +xMult per card sold)
     _fire_shop_joker_context(gs, selling_card=True)
 

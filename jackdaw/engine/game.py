@@ -2221,6 +2221,14 @@ def _round_won(gs: dict[str, Any]) -> None:
     # (state_events.lua:270 — temp_handsize cleared at round end).
     if rr.get("temp_handsize"):
         gs["hand_size"] = gs.get("hand_size", 8) - rr.pop("temp_handsize")
+    # Cerulean Bell's forced card is forced for its round only: vanilla nils
+    # forced_selection on every playing card right after (state_events.lua).
+    # Left on, the card played or discarded last came back forced in the
+    # next round, whose plays then had to take it.
+    for card in deck:
+        ability = getattr(card, "ability", None)
+        if isinstance(ability, dict):
+            ability.pop("forced_selection", None)
     blind_on_deck = gs.get("blind_on_deck", "Small")
     rr["blind_states"][blind_on_deck] = "Defeated"
     # Remembered for cash-out tag hooks (Investment Tag pays after a boss).

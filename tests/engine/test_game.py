@@ -1873,6 +1873,20 @@ class TestCeruleanBellForcedCard:
         with pytest.raises(IllegalActionError, match="Forced card"):
             step(gs, Discard(card_indices=(0, 1)))
 
+    def test_no_card_stays_forced_after_the_round(self):
+        """The forced card is forced for its round only: one played, one
+        discarded and one held at the win all go back to the deck unforced."""
+        gs = self._setup()
+        gs["blind"].chips = 10**9
+        step(gs, Discard(card_indices=(5, 6)))
+        gs["hand"][0].ability["forced_selection"] = True
+        step(gs, PlayHand(card_indices=(0, 1)))
+        gs["hand"][2].ability["forced_selection"] = True
+        gs["blind"].chips = 1
+        step(gs, PlayHand(card_indices=(2, 3)))
+        assert gs["phase"] == GamePhase.ROUND_EVAL
+        assert not any(c.ability.get("forced_selection") for c in gs["deck"])
+
 
 # ---------------------------------------------------------------------------
 # Perkeo negative copy: cost, slot bonus, deep copy (bug #68, ESWXXNUU)

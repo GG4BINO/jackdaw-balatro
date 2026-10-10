@@ -45,6 +45,7 @@ from jackdaw.engine.actions import (
     SwapJokersRight,
     UseConsumable,
 )
+from jackdaw.engine.card_utils import can_afford
 
 
 class IllegalActionError(Exception):
@@ -1240,7 +1241,7 @@ def _handle_buy_card(gs: dict[str, Any], idx: int) -> dict[str, Any]:
         raise IllegalActionError(f"Invalid shop index {idx}")
 
     card = shop_cards[idx]
-    if card.cost > gs.get("dollars", 0):
+    if not can_afford(gs, card.cost):
         raise IllegalActionError("Cannot afford card")
 
     # Space check — mirrors shop.py:buy_card; Negative cards need no room.
@@ -1516,7 +1517,7 @@ def _handle_redeem_voucher(gs: dict[str, Any], idx: int) -> dict[str, Any]:
         raise IllegalActionError(f"Invalid voucher index {idx}")
 
     card = vouchers[idx]
-    if card.cost > gs.get("dollars", 0):
+    if not can_afford(gs, card.cost):
         raise IllegalActionError("Cannot afford voucher")
 
     gs["dollars"] -= card.cost
@@ -1572,7 +1573,7 @@ def _handle_open_booster(gs: dict[str, Any], idx: int) -> dict[str, Any]:
         raise IllegalActionError(f"Invalid booster index {idx}")
 
     pack = boosters[idx]
-    if pack.cost > gs.get("dollars", 0):
+    if not can_afford(gs, pack.cost):
         raise IllegalActionError("Cannot afford booster")
 
     gs["dollars"] -= pack.cost
@@ -1773,7 +1774,7 @@ def _handle_reroll(gs: dict[str, Any]) -> dict[str, Any]:
 
     if free > 0:
         cr["free_rerolls"] = free - 1
-    elif gs.get("dollars", 0) >= cost:
+    elif can_afford(gs, cost):
         gs["dollars"] -= cost
     else:
         raise IllegalActionError("Cannot afford reroll")

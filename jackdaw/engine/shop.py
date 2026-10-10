@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from jackdaw.engine.card_utils import astronomer_active
+from jackdaw.engine.card_utils import astronomer_active, can_afford
 from jackdaw.engine.data.prototypes import BOOSTERS, CENTER_POOLS
 
 if TYPE_CHECKING:
@@ -673,7 +673,7 @@ def buy_card(
         return {"ok": False, "reason": "no_space"}
 
     # -- 2. Funds check --
-    if game_state.get("dollars", 0) < card.cost:
+    if not can_afford(game_state, card.cost):
         return {"ok": False, "reason": "insufficient_funds"}
 
     # -- 3. Remove from shop --
@@ -868,7 +868,7 @@ def reroll_shop(
 
     # -- 1. Cost --
     cost = calculate_reroll_cost(game_state)
-    if game_state.get("dollars", 0) < cost:
+    if not can_afford(game_state, cost):
         return {"ok": False, "reason": "insufficient_funds"}
 
     # -- 2. Decrement free_rerolls --

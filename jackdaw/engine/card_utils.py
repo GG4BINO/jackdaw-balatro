@@ -17,6 +17,18 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
+# can_afford — button_callbacks.lua can_buy / can_open / can_redeem / can_reroll
+# ---------------------------------------------------------------------------
+
+
+def can_afford(game_state: dict, cost: int) -> bool:
+    """Whether the shop lets *cost* be paid, as the game's buttons decide: a cost up to
+    the money above the debt floor (``bankrupt_at``: $20 down for each Credit Card),
+    and a free one always, even in debt."""
+    return cost <= 0 or cost <= game_state.get("dollars", 0) - game_state.get("bankrupt_at", 0)
+
+
+# ---------------------------------------------------------------------------
 # poll_edition — common_events.lua:2055
 # ---------------------------------------------------------------------------
 

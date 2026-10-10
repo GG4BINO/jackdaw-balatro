@@ -19,6 +19,7 @@ from jackdaw.engine.actions import (
     OpenBooster,
     PickPackCard,
     PlayHand,
+    RedeemVoucher,
     Reroll,
     SelectBlind,
     SellCard,
@@ -2158,3 +2159,63 @@ class TestCrimsonHeartPassiveEffects:
         assert joker.debuff and gs.get("joker_slots", 0) == slots
         set_joker_debuff(joker, False, gs)
         assert not joker.debuff and gs.get("joker_slots", 0) == slots
+
+
+# ---------------------------------------------------------------------------
+# Credit Card: buying into debt (button_callbacks.lua can_buy / can_open /
+# can_redeem / can_reroll compare a cost with dollars - bankrupt_at)
+# ---------------------------------------------------------------------------
+
+
+def _debt_shop(credit_card: bool = True, dollars: int = 2) -> dict[str, Any]:
+    from jackdaw.engine.card_factory import create_joker
+
+    gs = _setup_shop("DEBT")
+    if credit_card:
+        card = create_joker("j_credit_card")
+        card.add_to_deck(gs)
+        gs["jokers"].append(card)
+    gs["dollars"] = dollars
+    gs["current_round"]["reroll_cost"] = 5
+    gs["current_round"]["free_rerolls"] = 0
+    return gs
+
+
+class TestCreditCardDebt:
+    def test_a_card_is_bought_into_debt(self):
+        gs = _debt_shop()
+        card = gs["shop_cards"][0]
+        assert 2 < card.cost <= 22
+        step(gs, BuyCard(shop_index=0))
+        assert gs["dollars"] == 2 - card.cost < 0
+
+    def test_a_pack_a_voucher_and_a_reroll_too(self):
+        gs = _debt_shop(dollars=0)
+        step(gs, OpenBooster(card_index=0))
+        assert gs["dollars"] < 0
+        gs = _debt_shop(dollars=0)
+        voucher = gs["shop_vouchers"][0].cost
+        step(gs, RedeemVoucher(card_index=0))
+        assert gs["dollars"] == -voucher
+        gs = _debt_shop(dollars=0)
+        step(gs, Reroll())
+        assert gs["dollars"] == -5
+
+    def test_the_legal_actions_reach_down_to_the_debt_floor(self):
+        types = {type(a) for a in get_legal_actions(_debt_shop(dollars=0))}
+        assert {BuyCard, OpenBooster, RedeemVoucher, Reroll} <= types
+        types = {type(a) for a in get_legal_actions(_debt_shop(dollars=-20))}
+        assert not {BuyCard, OpenBooster, RedeemVoucher, Reroll} & types
+
+    def test_without_it_the_money_is_the_limit(self):
+        gs = _debt_shop(credit_card=False)
+        with pytest.raises(IllegalActionError):
+            step(gs, BuyCard(shop_index=0))
+        with pytest.raises(IllegalActionError):
+            step(gs, Reroll())
+
+    def test_a_free_card_is_taken_while_in_debt(self):
+        gs = _debt_shop(dollars=-5)
+        gs["shop_cards"][0].cost = 0
+        step(gs, BuyCard(shop_index=0))
+        assert gs["dollars"] == -5

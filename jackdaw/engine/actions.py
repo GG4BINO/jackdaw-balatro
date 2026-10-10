@@ -35,6 +35,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
+from jackdaw.engine.card_utils import can_afford
+
 if TYPE_CHECKING:
     from jackdaw.engine.card import Card
 
@@ -436,7 +438,6 @@ def _legal_round_eval(gs: dict[str, Any]) -> list[Action]:
 
 def _legal_shop(gs: dict[str, Any]) -> list[Action]:
     actions: list[Action] = []
-    dollars: int = gs.get("dollars", 0)
     jokers: list[Card] = gs.get("jokers", [])
     joker_slots: int = gs.get("joker_slots", 5)
     consumables: list[Card] = gs.get("consumables", [])
@@ -445,7 +446,7 @@ def _legal_shop(gs: dict[str, Any]) -> list[Action]:
     # Buy cards from shop
     shop_cards: list[Card] = gs.get("shop_cards", [])
     for i, card in enumerate(shop_cards):
-        if card.cost > dollars:
+        if not can_afford(gs, card.cost):
             continue
         # Check slot availability
         card_set = card.ability.get("set", "") if isinstance(card.ability, dict) else ""
@@ -473,20 +474,20 @@ def _legal_shop(gs: dict[str, Any]) -> list[Action]:
     # Redeem vouchers
     shop_vouchers: list[Card] = gs.get("shop_vouchers", [])
     for i, voucher in enumerate(shop_vouchers):
-        if voucher.cost <= dollars:
+        if can_afford(gs, voucher.cost):
             actions.append(RedeemVoucher(card_index=i))
 
     # Open boosters
     shop_boosters: list[Card] = gs.get("shop_boosters", [])
     for i, booster in enumerate(shop_boosters):
-        if booster.cost <= dollars:
+        if can_afford(gs, booster.cost):
             actions.append(OpenBooster(card_index=i))
 
     # Reroll
     cr = gs.get("current_round", {})
     reroll_cost = cr.get("reroll_cost", 5)
     free_rerolls = cr.get("free_rerolls", 0)
-    if free_rerolls > 0 or dollars >= reroll_cost:
+    if free_rerolls > 0 or can_afford(gs, reroll_cost):
         actions.append(Reroll())
 
     # Next round (always available in shop)

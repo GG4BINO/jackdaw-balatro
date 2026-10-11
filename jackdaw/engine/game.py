@@ -1156,15 +1156,7 @@ def _handle_cash_out(gs: dict[str, Any]) -> dict[str, Any]:
     # (button_callbacks.lua:2933: G.GAME.shop_d6ed = nil).
     gs.pop("shop_d6ed", None)
 
-    # End-of-round targeting-card re-roll (state_events.lua:273-276):
-    # idol / mail / ancient / castle streams advance once per round END
-    # (they are NOT re-rolled at round start; see start_round).
     rng = gs.get("rng")
-    if rng:
-        from jackdaw.engine.round_lifecycle import reset_round_targets
-
-        ante = gs.get("round_resets", {}).get("ante", 1)
-        reset_round_targets(rng, ante, gs)
 
     # Shuffle deck at cash-out (button_callbacks.lua:2918)
     # G.deck:shuffle('cashout'..G.GAME.round_resets.ante)
@@ -2254,6 +2246,16 @@ def _round_won(gs: dict[str, Any]) -> None:
     if blind_on_deck == "Boss" and getattr(blind, "name", "") == "The Manacle":
         if not getattr(blind, "disabled", False):
             gs["hand_size"] = gs.get("hand_size", 7) + 1
+
+    # End-of-round targeting-card re-roll (state_events.lua:273-276): the
+    # idol / mail / ancient / castle streams advance once per round end, in
+    # the event that sets ROUND_EVAL (after a boss's ease_ante), so the
+    # cash-out screen already shows the next round's targets. They are NOT
+    # re-rolled at round start (see start_round), nor at the cash-out.
+    if rng:
+        from jackdaw.engine.round_lifecycle import reset_round_targets
+
+        reset_round_targets(rng, rr["ante"], gs)
 
     # ------------------------------------------------------------------
     # 10. Calculate round earnings (for cash-out screen)

@@ -1269,6 +1269,32 @@ class TestBurglarOnBlindSelect:
         assert gs["current_round"]["discards_left"] == 0
 
 
+class TestRoundTargetsAreDrawnAsTheRoundEnds:
+    """The round targets (The Idol's card, Mail-In Rebate's rank, Ancient
+    Joker's and Castle's suits) are drawn again as the round ends, in the
+    event that sets ROUND_EVAL (state_events.lua end_round), not at the
+    cash-out: the live game's cash-out screen shows the next round's
+    Castle suit already (a played run: 2IRX7AFB)."""
+
+    KEYS = ("idol_card", "mail_card", "ancient_card", "castle_card")
+
+    def _targets(self, gs):
+        import copy
+
+        return copy.deepcopy({key: gs["current_round"].get(key) for key in self.KEYS})
+
+    def test_the_targets_are_drawn_when_the_round_is_won(self):
+        gs = _init_gs("TARGETS1")
+        step(gs, SelectBlind())
+        during = self._targets(gs)
+        gs["chips"] = 10**9
+        step(gs, PlayHand(card_indices=(0,)))
+        won = self._targets(gs)
+        assert won != during  # the Ancient suit is never the round's again
+        step(gs, CashOut())
+        assert self._targets(gs) == won
+
+
 class TestVoucherTagAddsShopVoucher:
     """Bug #29: voucher_add was unwired — Voucher Tag never added its
     extra shop voucher ('Voucher_fromtag' stream, tag.lua:302-318).

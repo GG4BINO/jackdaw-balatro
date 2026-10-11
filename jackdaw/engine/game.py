@@ -2458,6 +2458,7 @@ def _apply_setting_blind_mutations(
                         # highest number of all (EIL9FE1A, on the PC and on a
                         # PS5: the dealt hand is a 53-card shuffle's).
                         gs.setdefault("deck", []).append(c)
+                    _cards_added(gs, [c])
             elif ctype in ("Joker", "Tarot", "Planet", "Spectral"):
                 # Riff-raff ('rif', Common), Cartomancer ('car'), 8 Ball
                 # ('8ba'), etc. — roll the real pool with the descriptor's
@@ -2709,6 +2710,7 @@ def _apply_consumable_result(
         from jackdaw.engine.card import _next_sort_id
 
         deck_list: list = gs.setdefault("deck", [])
+        made: list = []
         for card_spec in result.add_to_deck:
             # Cryptid: copy an existing card — copies are emplaced into the
             # HAND, not the draw pile (card.lua:1206-1213: copy_card +
@@ -2722,6 +2724,7 @@ def _apply_consumable_result(
                     _sort_hand_desc(gs.get("hand", []))
                 else:
                     deck_list.append(new_card)
+                made.append(new_card)
                 continue
             new_card = _Card()
             if "suit" in card_spec and "rank" in card_spec:
@@ -2733,6 +2736,8 @@ def _apply_consumable_result(
             if "enhancement" in card_spec:
                 new_card.set_ability(card_spec["enhancement"])
             deck_list.append(new_card)
+            made.append(new_card)
+        _cards_added(gs, made)
 
     # ---- Joker effects ----
 
@@ -2790,6 +2795,7 @@ def _resolve_create_descriptors(gs: dict[str, Any], descriptors: list[dict[str, 
     jokers: list = gs.setdefault("jokers", [])
     joker_slots = gs.get("joker_slots", 5)
     deck: list = gs.setdefault("deck", [])
+    made: list = []
 
     for desc in descriptors:
         count = desc.get("count", 1)
@@ -2836,6 +2842,8 @@ def _resolve_create_descriptors(gs: dict[str, Any], descriptors: list[dict[str, 
                     gs.setdefault("hand", []).append(card)
                 else:
                     deck.append(card)
+                made.append(card)
+    _cards_added(gs, made)
 
     # Re-sort hand if any cards were added during SELECTING_HAND
     if gs.get("phase") == GamePhase.SELECTING_HAND:
@@ -3095,6 +3103,16 @@ def _get_card_set(card: Any) -> str:
     if isinstance(ability, dict):
         return ability.get("set", "")
     return ""
+
+
+def _cards_added(gs: dict[str, Any], cards: list) -> None:
+    """Playing cards made into the run: every Joker sees them (the game's
+    ``playing_card_joker_effects``; Hologram grows X0.25 per card). The game
+    calls it for Marble's stone, Certificate's card, DNA's copy, Cryptid's
+    copies and Familiar's, Grim's and Incantation's cards, as for a playing
+    card bought or taken from a pack."""
+    if cards:
+        _fire_shop_joker_context(gs, playing_card_added=True, cards=list(cards))
 
 
 def _fire_shop_joker_context(gs: dict[str, Any], **context_flags: Any) -> list[dict[str, Any]]:

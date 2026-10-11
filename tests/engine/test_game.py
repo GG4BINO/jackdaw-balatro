@@ -1415,6 +1415,37 @@ class TestMarbleStoneShuffleTiming:
         assert sorted(c.sort_id for c in gs["hand"]) == sorted(c.sort_id for c in ref[-8:])
 
 
+class TestHologramSeesEveryCardMade:
+    """The game's playing_card_joker_effects runs for every playing card a
+    run makes, not only one bought or taken from a pack: Hologram grows
+    X0.25 per card. A played run (EIL9FE1A) scored 1.25x, 1.5x, ... the
+    plays' predictions as each blind's Marble stone went unseen."""
+
+    def _with(self, seed, *keys):
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _init_gs(seed)
+        gs["jokers"] = [create_joker(key) for key in keys]
+        for joker in gs["jokers"]:
+            joker.add_to_deck(gs)
+        return gs
+
+    def test_marbles_stone(self):
+        gs = self._with("HOLO1", "j_marble", "j_hologram")
+        step(gs, SelectBlind())
+        assert gs["jokers"][1].ability["x_mult"] == 1.25
+
+    @pytest.mark.parametrize("key, made", [("c_cryptid", 2), ("c_familiar", 3), ("c_grim", 2)])
+    def test_a_spectrals_cards(self, key, made):
+        from jackdaw.engine.card_factory import create_consumable
+
+        gs = self._with("HOLO2", "j_hologram")
+        step(gs, SelectBlind())
+        gs["consumables"] = [create_consumable(key)]
+        step(gs, UseConsumable(card_index=0, target_indices=(0,) if key == "c_cryptid" else ()))
+        assert gs["jokers"][0].ability["x_mult"] == 1 + 0.25 * made
+
+
 class TestDiscountRepricesOwnedCards:
     """Bug #34: buying Clearance Sale repriced only shop areas — vanilla's
     per-frame set_cost also drops OWNED jokers'/consumables' buy AND sell

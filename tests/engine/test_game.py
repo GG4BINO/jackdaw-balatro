@@ -1367,13 +1367,13 @@ class TestPillarPlayedThisAnte:
 
 
 class TestMarbleStoneShuffleTiming:
-    """Bug #33: Marble Joker's stone joined the deck BEFORE the per-round
-    'nr' shuffle, changing the whole permutation. Vanilla emplaces it via
-    a queued event AFTER the shuffle; it lands at the pile bottom
-    (live-verified: LS86UJ9R — dealt hand matches a stone-less 52-card
-    shuffle, stone at serialized deck index 0)."""
+    """Marble Joker's stone is shuffled with the deck: its events (made in
+    G.play, drawn to the deck) are queued before new_round's 'nr' shuffle
+    event. Seen on the PC and on a PS5 (EIL9FE1A, Black Deck: the Big
+    Blind's hand is a 53-card shuffle's, the stone numbered last). Bug #33
+    had it join after the shuffle, at the pile bottom (LS86UJ9R)."""
 
-    def test_stone_added_after_shuffle_at_bottom(self):
+    def test_stone_is_shuffled_with_the_deck(self):
         from jackdaw.engine.card_factory import create_joker
         from jackdaw.engine.rng import PseudoRandom
 
@@ -1381,20 +1381,17 @@ class TestMarbleStoneShuffleTiming:
         j = create_joker("j_marble")
         gs["jokers"] = [j]
         j.add_to_deck(gs)
+        step(gs, SelectBlind())
 
-        # Expected deal: shuffle a stone-less copy with the same stream.
-        ref = list(gs["deck"])
+        cards = gs["deck"] + gs["hand"]
+        stones = [c for c in cards if c.ability.get("effect") == "Stone Card"]
+        assert len(stones) == 1 and stones[0].sort_id == max(c.sort_id for c in cards)
+        # The deal: every card, the stone with them, sorted by number and
+        # shuffled with the round's stream.
+        ref = sorted(cards, key=lambda c: c.sort_id)
         ref_rng = PseudoRandom("MARBLE1")
         ref_rng.shuffle(ref, ref_rng.seed("nr1"))
-        expected_hand = sorted(c.card_key for c in ref[-8:])
-
-        step(gs, SelectBlind())
-        dealt = sorted(c.card_key for c in gs["hand"])
-        assert dealt == expected_hand
-
-        deck = gs["deck"]
-        stones = [i for i, c in enumerate(deck) if c.ability.get("effect") == "Stone Card"]
-        assert stones == [0]  # pile bottom, drawn last
+        assert sorted(c.sort_id for c in gs["hand"]) == sorted(c.sort_id for c in ref[-8:])
 
 
 class TestDiscountRepricesOwnedCards:

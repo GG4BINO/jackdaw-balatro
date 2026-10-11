@@ -1869,9 +1869,11 @@ def _handle_swap_hand(gs: dict[str, Any], idx: int, direction: int) -> dict[str,
     """Swap a hand card with its neighbor.
 
     *direction* is ``-1`` (left) or ``+1`` (right).
-    Free action — no cost, doesn't consume hands or discards.
+    Free action — no cost, doesn't consume hands or discards.  The game
+    lets the hand be dragged while an Arcana or Spectral pack deals it too,
+    and Death copies the card then rightmost.
     """
-    _require_phase(gs, GamePhase.SELECTING_HAND)
+    _require_phase(gs, GamePhase.SELECTING_HAND, GamePhase.PACK_OPENING)
 
     hand: list = gs.get("hand", [])
     other = idx + direction

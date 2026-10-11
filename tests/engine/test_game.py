@@ -26,6 +26,7 @@ from jackdaw.engine.actions import (
     SkipBlind,
     SkipPack,
     SortHand,
+    SwapHandLeft,
     SwapJokersLeft,
     UseConsumable,
     get_legal_actions,
@@ -639,6 +640,26 @@ class TestPackOpening:
         assert target.center_key == "m_glass"
         step(gs, SkipPack())
         assert gs["phase"] == GamePhase.SHOP and target in gs["deck"]
+
+    def test_the_hand_a_pack_deals_is_dragged_before_death(self):
+        """The game lets the hand an Arcana pack deals be dragged, and Death
+        copies the card then rightmost onto the other: a played run (EIL9FE1A)
+        dragged a 2 to the left of a King, and Death made the 2 a King."""
+        from jackdaw.engine.card_factory import create_consumable
+
+        gs = _setup_shop("PACK_DRAG")
+        pack = Card(center_key="p_arcana_normal_1", cost=4)
+        pack.ability = {"set": "Booster", "name": "Arcana Pack"}
+        gs["shop_boosters"] = [pack]
+        gs["dollars"] = 10
+        step(gs, OpenBooster(card_index=0))
+        gs["pack_cards"] = [create_consumable("c_death")]
+        high, low = gs["hand"][0], gs["hand"][-1]  # the hand is dealt high to low
+        for idx in range(len(gs["hand"]) - 1, 0, -1):
+            step(gs, SwapHandLeft(idx=idx))  # the low card dragged to the far left
+        assert gs["hand"][0] is low and gs["hand"][1] is high
+        step(gs, PickPackCard(card_index=0, target_indices=(0, 1)))
+        assert low.base.rank == high.base.rank and low.base.suit == high.base.suit
 
 
 class TestUseConsumable:

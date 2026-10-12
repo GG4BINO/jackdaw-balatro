@@ -1879,9 +1879,18 @@ def _handle_swap_hand(gs: dict[str, Any], idx: int, direction: int) -> dict[str,
 def _handle_swap_jokers(gs: dict[str, Any], idx: int, direction: int) -> dict[str, Any]:
     """Swap a joker with its neighbor.
 
-    *direction* is ``-1`` (left) or ``+1`` (right).
+    *direction* is ``-1`` (left) or ``+1`` (right).  The game lets the
+    Jokers be dragged wherever they are shown: at the blind choice, in a
+    round, on the cash-out screen, in the shop and with a pack open.
     """
-    _require_phase(gs, GamePhase.SELECTING_HAND, GamePhase.SHOP)
+    _require_phase(
+        gs,
+        GamePhase.BLIND_SELECT,
+        GamePhase.SELECTING_HAND,
+        GamePhase.ROUND_EVAL,
+        GamePhase.SHOP,
+        GamePhase.PACK_OPENING,
+    )
 
     jokers: list = gs.get("jokers", [])
     other = idx + direction

@@ -1269,6 +1269,29 @@ class TestBurglarOnBlindSelect:
         assert gs["current_round"]["discards_left"] == 0
 
 
+class TestJokersAreSwappedWhereverTheyAreShown:
+    """The game lets the Jokers be dragged at the blind choice, on the
+    cash-out screen and with a pack open, not only in a round and in the
+    shop (a played run, 2IRX7AFB, reordered them at the blind choice)."""
+
+    def test_jokers_are_swapped_at_the_blind_choice(self):
+        gs = _init_gs("SWAPJ1")
+        assert gs["phase"] == GamePhase.BLIND_SELECT
+        gs["jokers"] = [_joker_card("j_joker"), _joker_card("j_egg")]
+        step(gs, SwapJokersLeft(idx=1))
+        assert [j.center_key for j in gs["jokers"]] == ["j_egg", "j_joker"]
+
+    def test_jokers_are_swapped_on_the_cash_out_screen(self):
+        gs = _init_gs("SWAPJ2")
+        gs["jokers"] = [_joker_card("j_joker"), _joker_card("j_egg")]
+        step(gs, SelectBlind())
+        gs["chips"] = 10**9
+        step(gs, PlayHand(card_indices=(0,)))
+        assert gs["phase"] == GamePhase.ROUND_EVAL
+        step(gs, SwapJokersLeft(idx=1))
+        assert [j.center_key for j in gs["jokers"]] == ["j_egg", "j_joker"]
+
+
 class TestRoundTargetsAreDrawnAsTheRoundEnds:
     """The round targets (The Idol's card, Mail-In Rebate's rank, Ancient
     Joker's and Castle's suits) are drawn again as the round ends, in the

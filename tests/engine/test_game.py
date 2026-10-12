@@ -1601,6 +1601,36 @@ class TestD6TagRerollCost:
         assert calculate_reroll_cost(gs) == 0
 
 
+class TestCouponTagOncePerShop:
+    """Only one Coupon Tag fires per shop: tag.lua guards it with
+    G.GAME.shop_free, cleared at cash_out (button_callbacks.lua), so a
+    second one (e.g. a Double Tag copy) waits for the next shop.  Seen live
+    in IS185739: both fired in one shop and the next shop was charged."""
+
+    def _clear_to_shop(self, gs):
+        step(gs, SelectBlind())
+        gs["chips"] = 10**9
+        step(gs, PlayHand(card_indices=(0,)))
+        step(gs, CashOut())
+
+    def _all_free(self, gs) -> bool:
+        cards = gs["shop_cards"] + gs["shop_boosters"]
+        return bool(cards) and all(c.cost == 0 for c in cards)
+
+    def test_second_coupon_tag_waits_for_the_next_shop(self):
+        gs = _init_gs("COUPON2")
+        gs.setdefault("awarded_tags", []).extend([{"key": "tag_coupon"}, {"key": "tag_coupon"}])
+        self._clear_to_shop(gs)
+        assert self._all_free(gs)
+        fired = [e.get("shop_fired", False) for e in gs["awarded_tags"]]
+        assert fired == [True, False]
+
+        step(gs, NextRound())
+        self._clear_to_shop(gs)
+        assert self._all_free(gs)
+        assert all(e.get("shop_fired") for e in gs["awarded_tags"])
+
+
 # ---------------------------------------------------------------------------
 # Round-end seal effects (bugs #51/#52, LSGLNPN9)
 # ---------------------------------------------------------------------------

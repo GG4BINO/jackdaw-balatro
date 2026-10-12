@@ -1152,9 +1152,10 @@ def _handle_cash_out(gs: dict[str, Any]) -> dict[str, Any]:
     """
     _require_phase(gs, GamePhase.ROUND_EVAL)
 
-    # The D6 Tag's once-per-shop guard resets at cash-out
-    # (button_callbacks.lua:2933: G.GAME.shop_d6ed = nil).
+    # The once-per-shop guards of the D6 and Coupon Tags reset at cash-out
+    # (button_callbacks.lua: G.GAME.shop_d6ed = nil, G.GAME.shop_free = nil).
     gs.pop("shop_d6ed", None)
+    gs.pop("shop_free", None)
 
     rng = gs.get("rng")
 
@@ -2923,7 +2924,7 @@ def _fire_shop_tags(gs: dict[str, Any], rerolled: bool) -> None:
       base-edition shop Joker gains the edition and becomes free
       (tags.lua ``Tag:apply_to_run``). Applies to rerolled jokers too.
     * ``shop_final_pass`` — Coupon Tag: initial shop cards and boosters
-      become free (shop entry only).
+      become free (shop entry only, one Coupon Tag per shop).
     * ``shop_start`` — D6 Tag: rerolls start free (shop entry only).
 
     * ``voucher_add`` — Voucher Tag: an extra purchasable voucher rolled
@@ -2999,6 +3000,12 @@ def _fire_shop_tags(gs: dict[str, Any], rerolled: bool) -> None:
 
         result = tag.apply("shop_final_pass", gs, rng=rng)
         if result is not None and result.coupon:
+            # One Coupon Tag per shop (tag.lua: `not G.GAME.shop_free`); a
+            # second one (e.g. a Double Tag copy) stays pending for the
+            # next shop.  shop_free is cleared at the next cash_out.
+            if gs.get("shop_free"):
+                continue
+            gs["shop_free"] = True
             for c in gs.get("shop_cards", []) + gs.get("shop_boosters", []):
                 # couponed flag (not a bare cost=0) so reprice_shop keeps it.
                 c.ability["couponed"] = True

@@ -1687,6 +1687,53 @@ class TestRoundEndSealEffects:
         assert len(gs["consumables"]) == gs.get("consumable_slots", 2)
 
 
+class TestMimeRetriggersHeldEffectsAtRoundEnd:
+    """end_round (state_events.lua) runs each held card's round-end effect
+    (Gold card dollars, Blue Seal planet) once more per Red Seal and per Mime
+    (or a Blueprint copying it), each run checking consumable room again.
+    Seen live in E9XA5U3E: Mime and a held Blue Seal gave two Saturns."""
+
+    def _setup_win(self, *jokers):
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _init_gs("MIME_EOR")
+        gs["jokers"] = [create_joker(key) for key in jokers]
+        step(gs, SelectBlind())
+        gs["blind"].chips = 1
+        return gs
+
+    def test_mime_blue_seal_makes_two_planets(self):
+        gs = self._setup_win("j_mime")
+        gs["hand"][7].seal = "Blue"
+        step(gs, PlayHand(card_indices=(0,)))  # last hand = High Card
+        assert [c.center_key for c in gs["consumables"]] == ["c_pluto", "c_pluto"]
+
+    def test_the_repeat_needs_room_too(self):
+        from jackdaw.engine.card import Card as _C
+
+        gs = self._setup_win("j_mime")
+        gs["hand"][7].seal = "Blue"
+        filler = _C(center_key="c_pluto")
+        filler.ability = {"set": "Planet", "effect": ""}
+        gs["consumables"] = [filler]
+        step(gs, PlayHand(card_indices=(0,)))
+        assert len(gs["consumables"]) == 2
+
+    def test_blueprint_copying_mime_repeats_too(self):
+        gs = self._setup_win("j_blueprint", "j_mime")
+        gs["hand"][7].seal = "Blue"
+        gs["consumable_slots"] = 3
+        step(gs, PlayHand(card_indices=(0,)))
+        assert [c.center_key for c in gs["consumables"]] == ["c_pluto"] * 3
+
+    def test_mime_gold_card_pays_twice(self):
+        gs = self._setup_win("j_mime")
+        gs["hand"][7].ability["h_dollars"] = 3  # a Gold card's held payout
+        dollars = gs["dollars"]
+        step(gs, PlayHand(card_indices=(0,)))
+        assert gs["dollars"] == dollars + 6
+
+
 # ---------------------------------------------------------------------------
 # d_size passives adjust the CURRENT round (bug #53, LSH8NR94)
 # ---------------------------------------------------------------------------

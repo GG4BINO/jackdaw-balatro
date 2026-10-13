@@ -2127,38 +2127,64 @@ def _round_won(gs: dict[str, Any]) -> None:
     # h_dollars: Gold CARD enhancement pays $3 per copy HELD at round
     # end (get_end_of_round_effect, card.lua:1036-38), eased IMMEDIATELY
     # in the end_round loop (state_events.lua:221-24) — not part of the
-    # cash-out earnings.  Was never paid anywhere in the sim
-    # (live-verified: LSSFHWWS — live +$3 for a held Midas-golded
-    # Queen at the round-win compare).  Red seal retriggers the held
-    # effect (the reps loop above the payout).  Mime retriggers are
-    # not modelled here yet — no such collision observed live.
-    for c in hand:
-        if getattr(c, "debuff", False):
-            continue
-        _ab = getattr(c, "ability", None)
-        _hd = _ab.get("h_dollars", 0) if isinstance(_ab, dict) else 0
-        if _hd:
-            _reps = 2 if getattr(c, "seal", None) == "Red" else 1
-            gs["dollars"] = gs.get("dollars", 0) + _hd * _reps
-
+    # cash-out earnings (live-verified: LSSFHWWS).
+    # Blue Seal creates the planet for the LAST hand played, room
+    # permitting (card.lua:1047-53).
+    # The end_round reps loop runs a held card's effect once more per Red
+    # Seal and per Mime (or a Blueprint/Brainstorm copying it), but only
+    # when the first run had an effect; each run checks consumable room
+    # again (live-verified E9XA5U3E: Mime + held Blue Seal, two Saturns).
+    planet_key = None
     last_hand = gs.get("last_hand_played")
     if last_hand:
         from jackdaw.engine.consumables import _PLANET_HAND
 
-        planet_key = None
-        for pk, ht in _PLANET_HAND.items():
-            if ht == last_hand:
-                planet_key = pk
-                break
-        if planet_key:
-            # Over a copy: creating a card may sort the hand in place, and the
-            # loop must still see each held card once.
-            for c in list(hand):
-                if getattr(c, "seal", None) == "Blue" and not getattr(c, "debuff", False):
-                    _resolve_create_descriptors(
-                        gs,
-                        [{"type": "Planet", "forced_key": planet_key, "seed": "blusl"}],
-                    )
+        planet_key = next((pk for pk, ht in _PLANET_HAND.items() if ht == last_hand), None)
+
+    def _held_effect(c) -> bool:
+        did = False
+        _ab = getattr(c, "ability", None)
+        _hd = _ab.get("h_dollars", 0) if isinstance(_ab, dict) else 0
+        if _hd:
+            gs["dollars"] = gs.get("dollars", 0) + _hd
+            did = True
+        if (
+            planet_key
+            and getattr(c, "seal", None) == "Blue"
+            and len(gs.get("consumables", [])) < gs.get("consumable_slots", 2)
+        ):
+            _resolve_create_descriptors(
+                gs, [{"type": "Planet", "forced_key": planet_key, "seed": "blusl"}]
+            )
+            did = True
+        return did
+
+    from jackdaw.engine.jokers import JokerContext, calculate_joker
+
+    # Over a copy: creating a card may sort the hand in place, and the loop
+    # must still see each held card once.
+    jokers = gs.get("jokers", [])
+    for c in list(hand):
+        if getattr(c, "debuff", False) or not _held_effect(c):
+            continue
+        repeats = 1 if getattr(c, "seal", None) == "Red" else 0
+        for joker in jokers:
+            if getattr(joker, "debuff", False):
+                continue
+            result = calculate_joker(
+                joker,
+                JokerContext(
+                    repetition=True,
+                    cardarea="hand",
+                    other_card=c,
+                    end_of_round=True,
+                    jokers=jokers,
+                ),
+            )
+            if result and result.repetitions > 0:
+                repeats += result.repetitions
+        for _ in range(repeats):
+            _held_effect(c)
 
     # ------------------------------------------------------------------
     # 4. Return all cards to deck

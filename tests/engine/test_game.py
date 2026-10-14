@@ -195,6 +195,22 @@ class TestCashOut:
         step(gs, CashOut())
         assert gs["phase"] == GamePhase.SHOP
 
+    def test_green_deck_pays_hands_and_discards_and_no_interest(self):
+        """Green Deck (Back:apply_to_run sets G.GAME.modifiers): $2 per hand
+        left, $1 per discard left, no interest.  Jackdaw kept the values
+        outside ``modifiers`` and paid $1 a hand, nothing for discards, and
+        interest (run T6FTVLLF: $3 short at the first boss)."""
+        gs = initialize_run("b_green", 1, "CASHOUT_TEST")
+        step(gs, SelectBlind())
+        gs["blind"].chips = 1
+        gs["dollars"] = 20  # $4 of interest, were there any
+        step(gs, PlayHand(card_indices=(0, 1, 2, 3, 4)))
+        cr = gs["current_round"]
+        hands, discards = cr["hands_left"], cr["discards_left"]
+        assert hands and discards
+        step(gs, CashOut())
+        assert gs["dollars"] == 20 + 3 + 2 * hands + discards  # Small Blind: $3
+
 
 # ---------------------------------------------------------------------------
 # SellCard

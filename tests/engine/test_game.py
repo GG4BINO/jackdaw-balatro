@@ -679,6 +679,20 @@ class TestPackOpening:
 
 
 class TestUseConsumable:
+    def test_aura_gives_the_edition_its_scoring_value(self):
+        """Aura goes through card:set_edition: a Foil scores +50 chips, a Holo +10
+        Mult, a Polychrome X1.5 (it set only the flag, so the card scored nothing)."""
+        from jackdaw.engine.card_factory import create_consumable
+
+        gs = _init_gs("AURA_TEST")
+        step(gs, SelectBlind())
+        target = gs["hand"][0]
+        gs["consumables"] = [create_consumable("c_aura")]
+        step(gs, UseConsumable(card_index=0, target_indices=(0,)))
+        value = {"foil": ("chips", 50), "holo": ("mult", 10), "polychrome": ("x_mult", 1.5)}
+        field, amount = value[target.edition["type"]]
+        assert target.edition[field] == amount
+
     def test_use_planet_in_shop(self):
         gs = _setup_shop("MERCURY_TEST")
         from jackdaw.engine.data.hands import HandType

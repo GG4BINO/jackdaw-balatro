@@ -990,6 +990,29 @@ class TestSealEffects:
         assert len(gs.get("consumables", [])) == initial_cons + 1
 
 
+class TestCopiedDiscardJokers:
+    """Blueprint forwards every context to the Joker it copies (card.lua:2304): Burnt
+    Joker has no blueprint guard (card.lua:2749), Trading Card has one (card.lua:2802)."""
+
+    def _discard_with(self, key):
+        from jackdaw.engine.card_factory import create_joker
+        from jackdaw.engine.data.hands import HandType
+
+        gs = _mech_init("COPIED_DISCARD")
+        step(gs, SelectBlind())
+        gs["jokers"] = [create_joker("j_blueprint"), create_joker(key)]
+        levels = lambda: sum(gs["hand_levels"][hand].level for hand in HandType)  # noqa: E731
+        before = (levels(), gs["dollars"])
+        step(gs, Discard(card_indices=(0,) if key == "j_trading" else (0, 1)))
+        return levels() - before[0], gs["dollars"] - before[1]
+
+    def test_a_copied_burnt_joker_levels_the_hand_twice(self):
+        assert self._discard_with("j_burnt")[0] == 2
+
+    def test_a_copied_trading_card_pays_once(self):
+        assert self._discard_with("j_trading")[1] == 3
+
+
 class TestDoubleTag:
     def test_double_tag_duplicates(self):
         """Double Tag duplicates a newly awarded tag."""

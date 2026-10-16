@@ -1358,9 +1358,10 @@ def _mail(card: Card, ctx: JokerContext) -> JokerResult | None:
 def _trading(card: Card, ctx: JokerContext) -> JokerResult | None:
     """Trading Card: first discard of round, single card → +$3, destroy card.
 
-    Source: card.lua:2802. Returns extra={'destroy': True} to signal destruction.
+    Source: card.lua:2802 (``not context.blueprint``: a copy does nothing). Returns
+    extra={'destroy': True} to signal destruction.
     """
-    if ctx.discard and ctx.full_hand is not None:
+    if ctx.discard and not ctx.blueprint and ctx.full_hand is not None:
         if ctx.game.discards_used <= 0 and len(ctx.full_hand) == 1:
             return JokerResult(
                 dollars=card.ability.get("extra", 3),
@@ -2583,9 +2584,10 @@ def _mr_bones(card: Card, ctx: JokerContext) -> JokerResult | None:
 def _burnt(card: Card, ctx: JokerContext) -> JokerResult | None:
     """Burnt Joker: level up discard hand on first discard of round.
 
-    Source: card.lua:2749. Fires in discard context when discards_used <= 0.
+    Source: card.lua:2749. Fires in discard context when discards_used <= 0; no
+    blueprint guard there, so a Blueprint or Brainstorm copying it levels again.
     """
-    if ctx.discard and not ctx.blueprint and not ctx.hook:
+    if ctx.discard and not ctx.hook:
         if ctx.game.discards_used <= 0 and ctx.other_card is not None:
             if ctx.full_hand and ctx.other_card is ctx.full_hand[-1]:
                 return JokerResult(level_up=True)

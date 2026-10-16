@@ -207,9 +207,14 @@ class Card:
     rental: bool = False
 
     def set_base(self, card_key: str, suit: str, value: str) -> None:
-        """Populate base fields from P_CARDS data, matching Card:set_base."""
+        """Populate base fields from P_CARDS data, matching Card:set_base: a card that had
+        a base keeps its ``suit_nominal_original`` (card.lua:109-110), the hand order's
+        tie-break, so one Death, a suit Tarot or Strength changed sorts by its first suit."""
+        original = self.base.suit_nominal_original if self.base is not None else None
         self.card_key = card_key
         self.base = CardBase.from_card_key(card_key, suit, value)
+        if original is not None:
+            self.base.suit_nominal_original = original
 
     def set_ability(
         self,

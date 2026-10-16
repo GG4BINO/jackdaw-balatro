@@ -693,3 +693,29 @@ class TestStoneCardNotFace:
         c.set_base("D_K", "Diamonds", "King")
         c.set_ability("c_base")
         assert c.is_face() is True
+
+
+class TestOriginalSuitKept:
+    """card.lua:109-110: set_base keeps the card's suit_nominal_original, the hand order's
+    tie-break (get_nominal) between cards of one rank and suit, so a card Death, a suit
+    Tarot or Strength changed sorts by the suit it was made with."""
+
+    def test_change_suit_and_rank_keep_the_original_suit(self):
+        from jackdaw.engine.card_factory import create_playing_card
+
+        card = create_playing_card(Suit("Hearts"), Rank("2"))
+        original = card.base.suit_nominal_original
+        card.change_suit("Clubs")
+        card.change_rank("King")
+        assert card.base.suit is Suit("Clubs") and card.base.rank is Rank("King")
+        assert card.base.suit_nominal_original == original
+
+    def test_a_king_death_made_from_a_heart_sorts_before_a_king_of_clubs(self):
+        """A played run (G4Z9VIXX, The Fish): a 2 of Hearts Death turned into a King of
+        Clubs came before the run's own King of Clubs in the game's hand."""
+        from jackdaw.engine.card_factory import create_playing_card
+
+        king = create_playing_card(Suit("Clubs"), Rank("King"))
+        made = create_playing_card(Suit("Hearts"), Rank("2"))  # newer: its own tie-break lower
+        made.set_base("C_K", "Clubs", "King")  # Death copies the King onto it
+        assert made.get_nominal() > king.get_nominal()

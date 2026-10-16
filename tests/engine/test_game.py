@@ -952,6 +952,29 @@ class TestSealEffects:
         step(gs, Discard(card_indices=(0,)))
         assert len(gs.get("consumables", [])) == initial_cons + 1
 
+    def test_debuffed_purple_seal_creates_nothing(self):
+        """A debuffed card's seal does nothing (card.lua:2243, calculate_seal)."""
+        gs = _mech_init("PURPLE_SEAL")
+        step(gs, SelectBlind())
+        gs["hand"][0].seal = "Purple"
+        gs["hand"][0].debuff = True
+        initial_cons = len(gs.get("consumables", []))
+        step(gs, Discard(card_indices=(0,)))
+        assert len(gs.get("consumables", [])) == initial_cons
+
+    def test_debuffed_purple_seal_hooked_creates_nothing(self):
+        """The Hook's discard runs the same seal check (state_events.lua:400)."""
+        from jackdaw.engine.game import _fire_discard_effects
+
+        gs = _mech_init("PURPLE_SEAL")
+        step(gs, SelectBlind())
+        live, debuffed = gs["hand"][0], gs["hand"][1]
+        live.seal = debuffed.seal = "Purple"
+        debuffed.debuff = True
+        initial_cons = len(gs.get("consumables", []))
+        _fire_discard_effects(gs, [debuffed, live], hook=True)
+        assert len(gs.get("consumables", [])) == initial_cons + 1
+
 
 class TestDoubleTag:
     def test_double_tag_duplicates(self):

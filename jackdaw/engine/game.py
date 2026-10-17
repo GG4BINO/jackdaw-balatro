@@ -1396,10 +1396,10 @@ def _apply_selling_self_mutations(
             candidates = [joker for joker in jokers if joker is not sold_card]
             rng = gs.get("rng")
             if candidates and len(jokers) <= gs.get("joker_slots", 5) and rng is not None:
-                import copy
+                from jackdaw.engine.card import copied
 
                 chosen, _ = rng.element(candidates, rng.seed("invisible"))
-                duplicate = copy.deepcopy(chosen)
+                duplicate = copied(chosen, strip_negative=True)  # card.lua:2384
                 if "invis_rounds" in duplicate.ability:
                     duplicate.ability["invis_rounds"] = 0
                 duplicate.add_to_deck(gs)
@@ -3234,11 +3234,11 @@ def _apply_shop_mutations(
                 if consumables:
                     rng = gs.get("rng")
                     if rng:
-                        import copy
+                        from jackdaw.engine.card import copied
 
                         seed_val = rng.seed("perkeo")
                         original, _ = rng.element(consumables, seed_val)
-                        duplicate = copy.deepcopy(original)
+                        duplicate = copied(original)  # card.lua:2417
                         duplicate.set_edition({"negative": True})
                         duplicate.set_cost(
                             inflation=gs.get("inflation", 0),

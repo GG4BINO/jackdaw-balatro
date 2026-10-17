@@ -29,6 +29,17 @@ def _next_sort_id() -> int:
     return _sort_id_counter
 
 
+def copied(card: Card, *, strip_negative: bool = False) -> Card:
+    """common_events.lua ``copy_card``: a new card, with its own number, holding the
+    other's ability, base, edition and seal; ``strip_negative``: without its edition when
+    it is Negative (Ankh, Invisible Joker: ``chosen.edition and chosen.edition.negative``)."""
+    new = copy.deepcopy(card)
+    new.sort_id = _next_sort_id()
+    if strip_negative and new.edition and new.edition.get("negative"):
+        new.set_edition(None)
+    return new
+
+
 def reset_sort_id_counter() -> None:
     """Reset to 0 (call at run start, matching G.sort_id = 0)."""
     global _sort_id_counter  # noqa: PLW0603

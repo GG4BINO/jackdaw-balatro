@@ -2563,3 +2563,23 @@ class TestRoundEndJokersIgnoreHeldCards:
         before = egg.ability.get("extra_value", 0)
         step(gs, PlayHand(card_indices=(0, 1, 2, 3, 4)))
         assert egg.ability.get("extra_value", 0) == before + 3
+
+
+class TestCopiedJokersAreNewCards:
+    """common_events.lua copy_card makes a new card (its own number); the Invisible Joker
+    and Ankh strip a Negative edition from the copy (card.lua:2384, :1445)."""
+
+    def test_invisible_jokers_copy_has_its_own_number_and_no_negative(self):
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _setup_shop()
+        ancient = create_joker("j_ancient")
+        ancient.set_edition({"negative": True})
+        invisible = create_joker("j_invisible")
+        invisible.ability["invis_rounds"] = 2
+        gs["jokers"] = [ancient, invisible]
+        step(gs, SellCard(area="jokers", card_index=1))
+        copies = [j for j in gs["jokers"] if j.center_key == "j_ancient"]
+        assert len(copies) == 2
+        assert copies[0].sort_id != copies[1].sort_id
+        assert copies[1].edition is None

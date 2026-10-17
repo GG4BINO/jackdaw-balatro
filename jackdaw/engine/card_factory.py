@@ -17,7 +17,6 @@ Source references:
 
 from __future__ import annotations
 
-import copy
 from typing import TYPE_CHECKING, Any
 
 from jackdaw.engine.card import Card
@@ -634,7 +633,9 @@ def resolve_create_descriptor(
     # ------------------------------------------------------------------
     copy_source: Card | None = descriptor.get("copy_of")
     if copy_source is not None:
-        return copy.deepcopy(copy_source)
+        from jackdaw.engine.card import copied
+
+        return copied(copy_source, strip_negative=True)  # card.lua:1445
 
     # ------------------------------------------------------------------
     # DNA: copy of a played playing card (card.lua:3505 copy_card).

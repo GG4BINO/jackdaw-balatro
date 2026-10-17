@@ -1116,10 +1116,11 @@ def _aura(_card: Card, ctx: ConsumableContext) -> ConsumableResult:
 
 @register_consumable("c_ectoplasm")
 def _ectoplasm(_card: Card, ctx: ConsumableContext) -> ConsumableResult:
-    """Ectoplasm: add Negative edition to a random editionless joker, -1 hand size.
+    """Ectoplasm: add Negative edition to a random editionless joker, and take
+    ``ecto_minus`` cards off the hand size (raised by one after, ``game._apply_consumable_result``).
 
-    Source: card.lua:1270.  Seed: 'ectoplasm'.
-    hand_size_mod=-1 is cumulative (each use subtracts 1 permanently).
+    Source: card.lua:1494 (``G.hand:change_size(-G.GAME.ecto_minus)``, then
+    ``ecto_minus + 1``): the first use -1, the second -2, the third -3.  Seed: 'ectoplasm'.
     """
     if ctx.rng is None:
         return ConsumableResult()
@@ -1129,7 +1130,7 @@ def _ectoplasm(_card: Card, ctx: ConsumableContext) -> ConsumableResult:
     target, _ = ctx.rng.element(editionless, ctx.rng.seed("ectoplasm"))
     return ConsumableResult(
         add_edition={"target": target, "edition": {"negative": True}},
-        hand_size_mod=-1,
+        hand_size_mod=-((ctx.game_state or {}).get("ecto_minus") or 1),
     )
 
 

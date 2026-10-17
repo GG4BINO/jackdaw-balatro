@@ -2527,3 +2527,20 @@ class TestCreditCardDebt:
         gs["shop_cards"][0].cost = 0
         step(gs, BuyCard(shop_index=0))
         assert gs["dollars"] == -5
+
+
+class TestEctoplasmHandSize:
+    """card.lua: Ectoplasm takes ``G.GAME.ecto_minus`` cards off the hand, then raises it
+    by one: the first use -1, the second -2, the third -3."""
+
+    def test_each_ectoplasm_takes_one_more_card_than_the_last(self):
+        from jackdaw.engine.card_factory import create_consumable
+
+        gs = _setup_shop()
+        gs["jokers"] = [_joker_card("j_joker"), _joker_card("j_egg")]
+        before = gs["hand_size"]
+        for taken in (1, 3):
+            gs["consumables"] = [create_consumable("c_ectoplasm")]
+            step(gs, UseConsumable(card_index=0))
+            assert gs["hand_size"] == before - taken
+        assert gs["ecto_minus"] == 3

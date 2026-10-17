@@ -2807,9 +2807,11 @@ def _apply_consumable_result(
 
     # ---- Game state ----
 
-    # n. Hand size modification (Ectoplasm -1, Ouija -1)
+    # n. Hand size modification (Ectoplasm -ecto_minus, Ouija -1)
     if getattr(result, "hand_size_mod", 0):
         gs["hand_size"] = gs.get("hand_size", 8) + result.hand_size_mod
+        if card_key == "c_ectoplasm":
+            gs["ecto_minus"] = (gs.get("ecto_minus") or 1) + 1  # card.lua:1497
 
 
 def _resolve_create_descriptors(gs: dict[str, Any], descriptors: list[dict[str, Any]]) -> None:

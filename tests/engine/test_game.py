@@ -2544,3 +2544,22 @@ class TestEctoplasmHandSize:
             step(gs, UseConsumable(card_index=0))
             assert gs["hand_size"] == before - taken
         assert gs["ecto_minus"] == 3
+
+
+class TestRoundEndJokersIgnoreHeldCards:
+    """state_events.lua asks each Joker, for a held card with a round-end effect (a Blue
+    Seal, a Gold card), whether it repeats it (Mime). card.lua's round-end Jokers (Egg,
+    Campfire, Popcorn...) answer only the round's own end_of_round, not those."""
+
+    def test_egg_grows_once_with_a_blue_seal_held(self):
+        from jackdaw.engine.card_factory import create_joker
+
+        gs = _init_gs("SHOP_TEST")
+        egg = create_joker("j_egg")
+        gs["jokers"] = [egg]
+        step(gs, SelectBlind())
+        gs["blind"].chips = 1
+        gs["hand"][-1].set_seal("Blue")
+        before = egg.ability.get("extra_value", 0)
+        step(gs, PlayHand(card_indices=(0, 1, 2, 3, 4)))
+        assert egg.ability.get("extra_value", 0) == before + 3

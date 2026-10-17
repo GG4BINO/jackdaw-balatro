@@ -671,6 +671,12 @@ def _is_suit(ctx: JokerContext, suit: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+def _round_end(ctx: JokerContext) -> bool:
+    """The round's own end_of_round, not a held card's at it (card.lua:2874: the
+    ``individual`` and ``repetition`` branches, Mime's, come first)."""
+    return ctx.end_of_round and not ctx.individual and not ctx.repetition
+
+
 # Joker handlers — suit-conditional per scored card (individual context)
 # Source: card.lua:3065 (Suit Mult), 3224-3260 (named suit jokers)
 # ---------------------------------------------------------------------------
@@ -1389,7 +1395,7 @@ def _to_do_list(card: Card, ctx: JokerContext) -> JokerResult | None:
         if target and ctx.scoring_name == target:
             extra = card.ability.get("extra", {})
             return JokerResult(dollars=extra.get("dollars", 4))
-    if ctx.end_of_round and not ctx.blueprint and ctx.rng is not None:
+    if _round_end(ctx) and not ctx.blueprint and ctx.rng is not None:
         from jackdaw.engine.card_factory import roll_to_do_hand
 
         roll_to_do_hand(card, ctx.rng, ctx.hand_levels, exclude_current=True)
@@ -1603,7 +1609,7 @@ def _popcorn(card: Card, ctx: JokerContext) -> JokerResult | None:
 
     Source: card.lua:2945. Mutation in end_of_round context.
     """
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         m = card.ability.get("mult", 20)
         sub = card.ability.get("extra", 4)
         if m - sub <= 0:
@@ -1687,7 +1693,7 @@ def _campfire(card: Card, ctx: JokerContext) -> JokerResult | None:
     if ctx.selling_card and not ctx.blueprint:
         card.ability["x_mult"] = card.ability.get("x_mult", 1) + card.ability.get("extra", 0.25)
         return JokerResult()
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         if ctx.blind and getattr(ctx.blind, "boss", False) and card.ability.get("x_mult", 1) > 1:
             card.ability["x_mult"] = 1
             return JokerResult()
@@ -1855,7 +1861,7 @@ def _hit_the_road(card: Card, ctx: JokerContext) -> JokerResult | None:
         if not ctx.other_card.debuff and ctx.other_card.get_id() == 11:
             card.ability["x_mult"] = card.ability.get("x_mult", 1) + card.ability.get("extra", 0.5)
             return JokerResult(Xmult_mod=card.ability["x_mult"])
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         if card.ability.get("x_mult", 1) > 1:
             card.ability["x_mult"] = 1
             return JokerResult()
@@ -2199,7 +2205,7 @@ def _gros_michel(card: Card, ctx: JokerContext) -> JokerResult | None:
     Source: card.lua:3019 (end_of_round), scoring via mult_mod.
     Sets pool_flags.gros_michel_extinct on destruction.
     """
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         extra = card.ability.get("extra", {})
         odds = extra.get("odds", 6)
         if ctx.rng is not None:
@@ -2223,7 +2229,7 @@ def _cavendish(card: Card, ctx: JokerContext) -> JokerResult | None:
 
     Source: card.lua:3019. Same destruction pattern as Gros Michel.
     """
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         extra = card.ability.get("extra", {})
         odds = extra.get("odds", 1000)
         if ctx.rng is not None:
@@ -2377,7 +2383,7 @@ def _delayed_grat_dollars(card: Card, game: GameSnapshot) -> int:
 @register("j_rocket")
 def _rocket(card: Card, ctx: JokerContext) -> JokerResult | None:
     """Rocket: +$2 to dollar payout after each boss blind. Source: card.lua:2896."""
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         if ctx.blind and getattr(ctx.blind, "boss", False):
             extra = card.ability.get("extra", {})
             extra["dollars"] = extra.get("dollars", 1) + extra.get("increase", 2)
@@ -2396,7 +2402,7 @@ def _egg(card: Card, ctx: JokerContext) -> JokerResult | None:
     buy=4/sell=5, sim's direct sell bump left buy=$0).  The caller
     runs the coupon-pop + set_cost.
     """
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         inc = card.ability.get("extra", 3)
         card.ability["extra_value"] = card.ability.get("extra_value", 0) + inc
         return JokerResult(extra={"set_cost_cards": [card]})
@@ -2409,7 +2415,7 @@ def _gift_card(card: Card, ctx: JokerContext) -> JokerResult | None:
 
     Source: card.lua:2920. Iterates all jokers (and consumables).
     """
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         # Applied by the round-end caller: vanilla bumps extra_value on
         # every JOKER and CONSUMABLE and re-runs set_cost on each
         # (card.lua:3325-3341) — that set_cost pass is also what
@@ -2424,7 +2430,7 @@ def _invisible(card: Card, ctx: JokerContext) -> JokerResult | None:
 
     Source: card.lua:2909. Counter: ability.invis_rounds.
     """
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         card.ability["invis_rounds"] = card.ability.get("invis_rounds", 0) + 1
         return JokerResult()
     if ctx.selling_self and not ctx.blueprint:
@@ -2600,7 +2606,7 @@ def _turtle_bean(card: Card, ctx: JokerContext) -> JokerResult | None:
 
     Source: card.lua:2903. Effect is via h_size (passive). Decay in end_of_round.
     """
-    if ctx.end_of_round and not ctx.blueprint:
+    if _round_end(ctx) and not ctx.blueprint:
         extra = card.ability.get("extra", {})
         h_size = extra.get("h_size", 5)
         h_mod = extra.get("h_mod", 1)
